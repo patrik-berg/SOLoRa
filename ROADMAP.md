@@ -35,10 +35,14 @@
 
 ## Phase 3 — Beta delivery
 
-- Produce cross-platform build artifacts.
-- Automate versioning as `v0.x.x-beta.N`.
-- Publish prereleases through GitHub Actions.
-- Add signed update metadata and an opt-in **Install beta** flow.
+- **Status: beta packaging and publication foundation implemented; client updater and native installers remain.**
+- [x] Produce a platform-neutral Python/web beta bundle with migrations and a local launcher.
+- [x] Calculate the next `v0.x.x-beta.N` automatically for a selected `0.x.x` base.
+- [x] Publish only manually confirmed GitHub prereleases after the complete CI suite.
+- [x] Generate SHA-256 update metadata and signed GitHub build-provenance attestations.
+- [ ] Produce and sign native macOS, Windows, and Linux installers.
+- [ ] Define updater trust, rollback, and database-backup behavior.
+- [ ] Add an opt-in **Install beta** flow to the SOLoRa client.
 
 ## Stable releases
 

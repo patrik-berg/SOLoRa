@@ -1,0 +1,113 @@
+name: Beta release
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_version:
+        description: "Base version in 0.x.x form; the next beta number is automatic"
+        required: true
+        default: "0.2.0"
+        type: string
+      confirm_prerelease:
+        description: "Publish a GitHub prerelease (never Stable)"
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: solora-beta-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-beta:
+    if: ${{ inputs.confirm_prerelease }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Require the default branch
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: test "$RELEASE_REF" = "refs/heads/main"
+
+      - name: Check out repository and tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        run: corepack enable && corepack prepare pnpm@11.19.0 --activate
+
+      - name: Install dependencies
+        run: make setup
+
+      - name: Verify release source
+        run: make check
+
+      - name: Select next beta version
+        id: version
+        env:
+          BASE_VERSION: ${{ inputs.base_version }}
+        run: |
+          version="$(python3 scripts/beta_release.py next --base "$BASE_VERSION")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Stage beta build metadata
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python3 scripts/beta_release.py stage --version "$VERSION"
+
+      - name: Build versioned beta
+        run: make build
+
+      - name: Package portable beta and update manifest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 scripts/beta_release.py bundle \
+            --version "$VERSION" \
+            --commit "$RELEASE_COMMIT" \
+            --repository "$RELEASE_REPOSITORY"
+
+      - name: Retain workflow artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: solora-${{ steps.version.outputs.version }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Sign build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: release/*
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" release/* \
+            --target "$GITHUB_SHA" \
+            --title "SOLoRa $VERSION" \
+            --generate-notes \
+            --prerelease

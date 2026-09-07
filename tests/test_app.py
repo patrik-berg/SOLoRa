@@ -7,6 +7,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 
+from solora import __version__
 from solora.app import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,6 +69,7 @@ def test_forum_api_persists_threads_and_posts(tmp_path: Path) -> None:
             "service": "solora",
             "status": "ok",
         }
+        assert client.get("/openapi.json").json()["info"]["version"] == __version__
         assert client.get("/api/threads").json() == []
 
         created = client.post("/api/threads", json={"title": "  Första tråden  "})

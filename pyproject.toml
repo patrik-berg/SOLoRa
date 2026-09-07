@@ -33,6 +33,7 @@ packages = ["backend/src/solora"]
 [tool.pytest.ini_options]
 addopts = "--strict-markers --cov=solora --cov-report=term-missing --cov-fail-under=90"
 testpaths = ["tests"]
+pythonpath = [".", "backend/src"]
 filterwarnings = [
   "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning:starlette.testclient",
 ]
