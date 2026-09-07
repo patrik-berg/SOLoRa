@@ -14,6 +14,7 @@ class ThreadRecord(Base):
     __tablename__ = "threads"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    sync_id: Mapped[bytes | None] = mapped_column(LargeBinary(12))
     title: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
     posts: Mapped[list["PostRecord"]] = relationship(
@@ -36,6 +37,7 @@ class PostRecord(Base):
     thread: Mapped[ThreadRecord] = relationship(back_populates="posts")
 
 
+Index("ux_threads_sync_id", ThreadRecord.sync_id, unique=True)
 Index("ux_posts_message_id", PostRecord.message_id, unique=True)
 
 
@@ -62,3 +64,14 @@ class ReceivedMessageRecord(Base):
     source_node: Mapped[int] = mapped_column(Integer)
     message_type: Mapped[int] = mapped_column(Integer)
     received_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class RepairRequestRecord(Base):
+    """A missing object already requested from one peer."""
+
+    __tablename__ = "repair_requests"
+
+    destination: Mapped[int] = mapped_column(Integer, primary_key=True)
+    object_kind: Mapped[int] = mapped_column(Integer, primary_key=True)
+    object_id: Mapped[bytes] = mapped_column(LargeBinary(12), primary_key=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime)

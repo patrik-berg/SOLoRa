@@ -8,6 +8,7 @@ from alembic import command
 from alembic.config import Config
 
 from solora.adapters.persistence.database import Database
+from solora.adapters.persistence.records import ThreadRecord
 from solora.adapters.persistence.repository import SqlAlchemyForumRepository
 from solora.adapters.persistence.sync_repository import SqlAlchemySyncRepository
 from solora.adapters.transport.in_memory import InMemoryNetwork
@@ -57,8 +58,13 @@ def test_two_nodes_retry_loss_acknowledge_and_deduplicate(tmp_path: Path) -> Non
     network = InMemoryNetwork()
 
     with database_a.sessions() as session_a, database_b.sessions() as session_b:
-        assert SqlAlchemyForumRepository(session_a).create_thread("Gemensam tråd").id == 1
-        assert SqlAlchemyForumRepository(session_b).create_thread("Gemensam tråd").id == 1
+        shared_thread = SqlAlchemyForumRepository(session_a).create_thread("Gemensam tråd")
+        assert shared_thread.sync_id is not None
+        SqlAlchemyForumRepository(session_b).create_thread("Gemensam tråd")
+        receiver_thread = session_b.get(ThreadRecord, 1)
+        assert receiver_thread is not None
+        receiver_thread.sync_id = bytes.fromhex(shared_thread.sync_id)
+        session_b.commit()
         node_a = SyncNode(
             SqlAlchemySyncRepository(session_a),
             network.connect(0xA),
@@ -96,7 +102,8 @@ def test_two_nodes_retry_loss_acknowledge_and_deduplicate(tmp_path: Path) -> Non
             transmission
             for transmission in network.transmissions
             if transmission.delivered
-            and PacketEnvelope.decode(transmission.frame.payload).message_type is MessageType.POST
+            and PacketEnvelope.decode(transmission.frame.payload).message_type
+            is MessageType.SYNC_POST
         )
         network.replay(delivered_post)
 
@@ -119,7 +126,9 @@ def test_pending_outbox_survives_sender_restart(tmp_path: Path) -> None:
     first_database = Database(url_a)
     first_network = InMemoryNetwork()
     with first_database.sessions() as session:
-        SqlAlchemyForumRepository(session).create_thread("Gemensam tråd")
+        shared_thread = SqlAlchemyForumRepository(session).create_thread("Gemensam tråd")
+        assert shared_thread.sync_id is not None
+        shared_sync_id = bytes.fromhex(shared_thread.sync_id)
         first_node = SyncNode(
             SqlAlchemySyncRepository(session),
             first_network.connect(0xA),
@@ -137,6 +146,10 @@ def test_pending_outbox_survives_sender_restart(tmp_path: Path) -> None:
     restarted_network = InMemoryNetwork()
     with restarted_database.sessions() as sender, receiver_database.sessions() as receiver:
         SqlAlchemyForumRepository(receiver).create_thread("Gemensam tråd")
+        receiver_thread = receiver.get(ThreadRecord, 1)
+        assert receiver_thread is not None
+        receiver_thread.sync_id = shared_sync_id
+        receiver.commit()
         restarted_node = SyncNode(
             SqlAlchemySyncRepository(sender),
             restarted_network.connect(0xA),

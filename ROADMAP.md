@@ -20,16 +20,18 @@
 
 ## Phase 2 — Two-node transport
 
-- **Status: serial adapter implemented; physical two-radio validation remains.**
+- **Status: serial adapter and hardware-independent repair implemented; physical two-radio validation remains.**
 - [x] Define a compact, versioned single-frame packet envelope.
 - [x] Add 96-bit message IDs, transactional deduplication, and `COMMIT_ACK` semantics.
 - [x] Persist an offline outbox with user-first priority and bounded exponential retry.
 - [x] Simulate loss, resend, duplicate delivery, acknowledgement, and restart with two virtual nodes.
 - [x] Add a thin USB/serial adapter using the official Meshtastic Python SDK and `PRIVATE_APP`.
 - [x] Cover serial mapping, routing-ACK isolation, queue errors, and selection with hardware-free mocks.
-- [ ] Execute the documented end-to-end procedure with two physical Meshtastic nodes.
+- [x] Add explicit `SYNC` inventories, batched `WANT`, missing-thread repair, and idempotent object transfer.
+- [x] Prove offline → reconnect → packet loss → bidirectional convergence with virtual nodes.
+- [ ] **Required Phase 2 validation gate:** execute the documented end-to-end procedure with two physical Meshtastic nodes.
 - [ ] Measure real payload overhead, airtime, queue behavior, ACKs, and channel utilization.
-- [ ] Design missing-thread repair, `WANT`/`SYNC`, fragmentation, and wider forum synchronization.
+- [ ] Decide fragmentation and automatic scheduling only after physical-radio measurements.
 
 ## Phase 3 — Beta delivery
 
