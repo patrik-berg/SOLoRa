@@ -12,6 +12,7 @@ coverage/
 node_modules/
 __pycache__/
 .pytest_cache/
+.tools/
 
 # Operating-system metadata
 .DS_Store
