@@ -22,8 +22,17 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install Python and dependencies
-        run: uv sync --extra dev --locked
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        run: corepack enable && corepack prepare pnpm@11.19.0 --activate
+
+      - name: Install dependencies
+        run: make setup
 
       - name: Run verification suite
         run: make check

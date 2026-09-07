@@ -5,6 +5,7 @@
 - [x] Initialize Git and connect GitHub.
 - [x] Document architecture, protocol boundaries, and contribution rules.
 - [x] Add a minimal local server scaffold and automated tests.
+- [x] Add a minimal React/Vite frontend scaffold and automated tests.
 - [x] Run lint, type checks, tests, and build validation in GitHub Actions.
 - [ ] Add branch protection after CI is stable.
 
@@ -12,7 +13,7 @@
 
 - Add SQLite migrations and repositories.
 - Create and display one forum thread with posts.
-- Serve a minimal accessible web interface locally.
+- Connect the accessible React interface to the local API.
 - Prove backup and migration behavior.
 
 ## Phase 2 — Two-node transport

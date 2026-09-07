@@ -6,14 +6,14 @@ SOLoRa is a local-first communication application intended to combine a small we
 
 - Python 3.12 and FastAPI for the local HTTP service
 - SQLite with SQLAlchemy and Alembic for the future persistence layer
-- Server-rendered HTML with small progressive enhancements for the first UI
+- React 19, TypeScript, and Vite for the local web interface
 - Meshtastic behind a transport interface so hardware is replaceable in tests
 - pytest, Ruff, and mypy for automated verification
 - `uv` for Python and dependency management
 
 ## Development
 
-Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/), then run:
+Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/), Node.js 24, and pnpm 11, then run:
 
 ```sh
 make setup
@@ -21,6 +21,6 @@ make check
 make dev
 ```
 
-`make dev` starts the scaffold server at `http://127.0.0.1:8000`. Its only endpoint is `GET /health`.
+Run `make dev-backend` and `make dev-frontend` in separate terminals. The backend starts at `http://127.0.0.1:8000`; the frontend starts at `http://127.0.0.1:5173`. No forum or radio functionality exists yet.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md), [PROTOCOL.md](PROTOCOL.md), and [ROADMAP.md](ROADMAP.md) before implementing product features.
