@@ -31,6 +31,30 @@ test('lists and opens a local thread', async () => {
 
   expect(await screen.findByRole('heading', { name: 'Första tråden' })).toBeInTheDocument()
   expect(screen.getByText('Tråden har inga inlägg ännu.')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Tillbaka till trådar' }))
+
+  expect(screen.getByRole('heading', { name: 'Välj en tråd' })).toBeInTheDocument()
+  expect(threadButton).toHaveFocus()
+})
+
+test('shows loading and empty states', async () => {
+  let resolveThreads: ((response: Response) => void) | undefined
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveThreads = resolve
+        }),
+    ),
+  )
+
+  render(<App />)
+
+  expect(screen.getByText('Läser trådar…')).toBeInTheDocument()
+  resolveThreads?.(Response.json([]))
+  expect(await screen.findByText('Inga trådar ännu. Skapa den första.')).toBeInTheDocument()
 })
 
 test('creates a thread and a post', async () => {

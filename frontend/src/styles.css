@@ -161,6 +161,21 @@ main {
   padding-bottom: 1.1rem;
 }
 
+.back-button {
+  margin-bottom: 0.85rem;
+  border-color: #30495b;
+  background: #102534;
+  box-shadow: none;
+  color: #a9c8e9;
+  font-size: 0.75rem;
+  padding: 0.42rem 0.65rem;
+}
+
+.back-button:hover {
+  border-color: #3c77a8;
+  background: #17344a;
+}
+
 label {
   display: block;
   margin-bottom: 0.45rem;
@@ -376,7 +391,7 @@ article p {
 }
 
 footer {
-  color: #587185;
+  color: #6d879b;
   font-size: 0.72rem;
   letter-spacing: 0.05em;
   padding: 0.8rem 0;
