@@ -18,6 +18,8 @@ Use `make setup` to create the Python 3.12 environment. Run `make dev` for the l
 
 Before submitting work, run every configured formatter, linter, test suite, and build command locally. Commands should be reproducible from the repository root.
 
+Before declaring a feature, bug fix, or substantial change complete, review every applicable item in `CHECKLIST.md` and resolve any unmet item.
+
 ## Coding Style & Naming Conventions
 
 Target Python 3.12. Ruff controls formatting and linting with 4-space indentation and a 100-character line limit. Use `snake_case` for modules and functions, `PascalCase` for classes, and typed interfaces at adapter boundaries. Keep domain code independent of FastAPI, SQLAlchemy, and Meshtastic.

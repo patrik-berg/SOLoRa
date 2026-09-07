@@ -10,6 +10,7 @@ def test_required_project_structure_exists() -> None:
         "frontend",
         "README.md",
         "ARCHITECTURE.md",
+        "CHECKLIST.md",
         "PROTOCOL.md",
         "ROADMAP.md",
     )
