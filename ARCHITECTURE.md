@@ -58,6 +58,12 @@ Meshtastic retains responsibility for `MeshPacket` routing, hop limits, packet/r
 
 `TransportSettings` and `create_transport()` select `in-memory` or `meshtastic-serial` through configuration without changing application/domain code. The current diagnostic CLI exercises the adapter directly; wiring a long-running radio service into the web process is deferred until lifecycle and per-callback database-session ownership are specified.
 
+### Local channel binding
+
+Channel discovery is an explicit settings action, never an idle poll. The adapter reads only enabled local channel indices, names, and roles from the official SDK; PSKs and other channel secrets do not cross the infrastructure boundary. The API caches the latest discovery result and SQLite stores only a user-confirmed `(node_id, channel_name, channel_index)` binding. A missing, renamed, moved, or differently connected node invalidates that binding and requires confirmation instead of silently falling back.
+
+Meshtastic channel indices are node-local: two nodes may both use `solora-link` at different indices. Each transport therefore validates its own exact binding. Outbound SOLoRa frames set that index in `sendData`; inbound `PRIVATE_APP` payloads are accepted only when the packet reports the selected local index. Other ports and other channels are ignored. Reading cached status creates no radio packets and the refresh operation only reads local node configuration, preserving **Normal state is silent**.
+
 ## Release policy
 
 GitHub Actions will eventually build immutable `v0.x.x-beta.N` artifacts. Stable promotion always requires explicit manual approval.

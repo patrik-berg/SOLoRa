@@ -4,7 +4,11 @@ import {
   createPost,
   createThread,
   getThread,
+  getMeshtasticSettings,
   listThreads,
+  refreshMeshtasticChannels,
+  selectMeshtasticChannel,
+  type MeshtasticSettings,
   type Thread,
   type ThreadSummary,
 } from './api.ts'
@@ -23,6 +27,10 @@ export default function App() {
   const [newPost, setNewPost] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [view, setView] = useState<'forum' | 'settings'>('forum')
+  const [radio, setRadio] = useState<MeshtasticSettings | null>(null)
+  const [radioLoading, setRadioLoading] = useState(false)
+  const [selectedChannel, setSelectedChannel] = useState('')
   const threadButtons = useRef(new Map<number, HTMLButtonElement>())
 
   async function refreshThreads() {
@@ -81,6 +89,60 @@ export default function App() {
     if (threadId !== undefined) threadButtons.current.get(threadId)?.focus()
   }
 
+  async function openSettings() {
+    setView('settings')
+    setError('')
+    setRadioLoading(true)
+    try {
+      const status = await getMeshtasticSettings()
+      setRadio(status)
+      if (status.selection) {
+        setSelectedChannel(`${status.selection.channel_index}:${status.selection.channel_name}`)
+      }
+    } catch {
+      setError('Det gick inte att läsa radioinställningarna.')
+    } finally {
+      setRadioLoading(false)
+    }
+  }
+
+  async function refreshRadio() {
+    setError('')
+    setRadioLoading(true)
+    try {
+      const status = await refreshMeshtasticChannels()
+      setRadio(status)
+      const preferred = status.selection_valid
+        ? status.selection?.channel_index
+        : status.recommended_channel_index
+      const channel = status.channels.find((candidate) => candidate.index === preferred)
+      setSelectedChannel(channel ? `${channel.index}:${channel.name}` : '')
+    } catch {
+      setError('Kunde inte ansluta till Meshtastic-noden.')
+    } finally {
+      setRadioLoading(false)
+    }
+  }
+
+  async function saveRadioChannel() {
+    const separator = selectedChannel.indexOf(':')
+    if (separator < 0) return
+    setError('')
+    setRadioLoading(true)
+    try {
+      setRadio(
+        await selectMeshtasticChannel(
+          Number(selectedChannel.slice(0, separator)),
+          selectedChannel.slice(separator + 1),
+        ),
+      )
+    } catch {
+      setError('Kanalen har ändrats. Uppdatera listan och bekräfta igen.')
+    } finally {
+      setRadioLoading(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <header>
@@ -88,11 +150,69 @@ export default function App() {
           <p className="eyebrow">Local forum · Phase 1</p>
           <h1>SOLoRa</h1>
         </div>
-        <span className="local-badge">Sparas lokalt</span>
+        <div className="header-actions">
+          <button className="secondary-button" onClick={() => void openSettings()} type="button">
+            Systeminställningar
+          </button>
+          <span className="local-badge">Sparas lokalt</span>
+        </div>
       </header>
 
       {error && <p className="error" role="alert">{error}</p>}
 
+      {view === 'settings' ? (
+        <main className="settings-main">
+          <section className="settings-card" aria-busy={radioLoading}>
+            <button className="back-button" onClick={() => setView('forum')} type="button">
+              <span aria-hidden="true">←</span> Till forumet
+            </button>
+            <p className="eyebrow">Systeminställningar</p>
+            <h2>Meshtastic-kanal</h2>
+            <p className="settings-intro">
+              SOLoRa rekommenderar <strong>solora-link</strong>. Kanalnycklar visas eller sparas aldrig här.
+            </p>
+
+            <dl className="radio-status">
+              <div><dt>Anslutning</dt><dd>{radio?.connected ? 'Ansluten' : 'Inte verifierad'}</dd></div>
+              <div><dt>Typ</dt><dd>{radio?.connection_type ?? '–'}</dd></div>
+              <div><dt>Nod-ID</dt><dd>{radio?.node_id ? `0x${radio.node_id.toString(16)}` : '–'}</dd></div>
+              <div><dt>Val</dt><dd>{radio?.selection_valid ? 'Bekräftat' : 'Kräver bekräftelse'}</dd></div>
+            </dl>
+
+            {radio?.error && <p className="settings-warning" role="status">{radio.error}</p>}
+
+            <button disabled={radioLoading} onClick={() => void refreshRadio()} type="button">
+              {radioLoading ? 'Uppdaterar…' : 'Uppdatera kanaler från noden'}
+            </button>
+
+            {radio && radio.channels.length > 0 && (
+              <div className="channel-picker">
+                <label htmlFor="meshtastic-channel">SOLoRa-kanal på denna nod</label>
+                <select
+                  id="meshtastic-channel"
+                  onChange={(event) => setSelectedChannel(event.target.value)}
+                  value={selectedChannel}
+                >
+                  <option value="">Välj kanal…</option>
+                  {radio.channels.map((channel) => (
+                    <option key={channel.index} value={`${channel.index}:${channel.name}`}>
+                      {channel.display_name} · index {channel.index} · {channel.role}
+                      {channel.recommended ? ' · rekommenderad' : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  disabled={!selectedChannel || radioLoading}
+                  onClick={() => void saveRadioChannel()}
+                  type="button"
+                >
+                  Bekräfta kanal
+                </button>
+              </div>
+            )}
+          </section>
+        </main>
+      ) : (
       <main>
         <aside className="thread-panel">
           <div className="panel-heading">
@@ -187,6 +307,7 @@ export default function App() {
           )}
         </section>
       </main>
+      )}
 
       <footer>Ingen radioanslutning · Ingen molnsynk</footer>
     </div>

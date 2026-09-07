@@ -32,6 +32,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--device", default=os.getenv("SOLORA_MESHTASTIC_DEVICE"))
     result.add_argument("--node-id", type=_node_id, default=1)
     result.add_argument("--channel", type=int, default=0)
+    result.add_argument("--channel-name", default=os.getenv("SOLORA_MESHTASTIC_CHANNEL_NAME"))
     result.add_argument("--hop-limit", type=int)
     result.add_argument("--send-to", type=_node_id)
     result.add_argument("--payload-hex")
@@ -48,6 +49,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         kind=TransportKind(args.transport),
         serial_device=args.device,
         channel_index=args.channel,
+        channel_name=args.channel_name,
         hop_limit=args.hop_limit,
     )
     transport = None
