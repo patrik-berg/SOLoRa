@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from solora.adapters.persistence.records import PostRecord, ThreadRecord
 from solora.domain.models import Post, Thread
+from solora.domain.protocol import message_id_hex, new_message_id
 
 
 def _post_entity(record: PostRecord) -> Post:
@@ -13,6 +14,7 @@ def _post_entity(record: PostRecord) -> Post:
         thread_id=record.thread_id,
         body=record.body,
         created_at=record.created_at,
+        message_id=message_id_hex(record.message_id) if record.message_id is not None else None,
     )
 
 
@@ -62,7 +64,7 @@ class SqlAlchemyForumRepository:
         if self.session.get(ThreadRecord, thread_id) is None:
             return None
 
-        record = PostRecord(thread_id=thread_id, body=body)
+        record = PostRecord(thread_id=thread_id, message_id=new_message_id(), body=body)
         self.session.add(record)
         self.session.commit()
         self.session.refresh(record)

@@ -67,6 +67,7 @@ test('creates a thread and a post', async () => {
     if (path.endsWith('/posts')) {
       return Response.json({
         id: 1,
+        message_id: '000000000000000000000001',
         thread_id: 2,
         body: 'Lokalt svar',
         created_at: '2026-09-07T12:02:00',
@@ -83,7 +84,7 @@ test('creates a thread and a post', async () => {
         title: 'Ny tråd',
         post_count: hasPost ? 1 : 0,
         posts: hasPost
-          ? [{ id: 1, thread_id: 2, body: 'Lokalt svar', created_at: '2026-09-07T12:02:00' }]
+          ? [{ id: 1, message_id: '000000000000000000000001', thread_id: 2, body: 'Lokalt svar', created_at: '2026-09-07T12:02:00' }]
           : [],
       })
     }
