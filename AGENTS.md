@@ -43,6 +43,20 @@ Communicate product-facing summaries in concise Swedish. Keep protocol changes s
 
 ## SOLoRa Reference Projects
 
+Treat Meshtastic's official [protobuf definitions](https://github.com/meshtastic/protobufs) and protocol documentation as the primary source. Verify constraints against the supported upstream version before implementation. The current definitions limit `Data.payload` to 233 bytes and identify application payloads with `PortNum`; use `PRIVATE_APP = 256` during private development unless SOLoRa later receives a registered port number.
+
+Keep the protocol layers separate:
+
+```text
+SOLoRa operations: POST / ACK / SYNC / WANT
+SOLoRa compact binary protocol
+Meshtastic Data.payload using PortNum = PRIVATE_APP
+Meshtastic MeshPacket: routing / ACK / hop limit
+LoRa
+```
+
+SOLoRa owns only the application protocol inside `Data.payload`. Do not recreate Meshtastic routing, hop handling, or mesh delivery behavior. Budget every SOLoRa header and body byte within the payload limit.
+
 For Meshtastic integration, synchronization, packet handling, node state, persistence, frontend status, and Linux/Raspberry Pi operation, consult these technical references when relevant:
 
 - [TC2-BBS-mesh](https://github.com/TheCommsChannel/TC2-BBS-mesh)
