@@ -1,0 +1,17 @@
+.DS_Store
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Generated output and dependency caches
+dist/
+build/
+coverage/
+node_modules/
+__pycache__/
+.pytest_cache/
+
+# Operating-system metadata
+.DS_Store
