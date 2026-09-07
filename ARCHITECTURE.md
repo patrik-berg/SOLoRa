@@ -11,7 +11,7 @@ SOLoRa is local-first: reading and writing remain available without internet or 
 3. **Application layer** — forum use cases plus the hardware-independent `SyncNode` orchestration service.
 4. **Domain layer** — forum entities and the compact binary packet codec.
 5. **Persistence adapters** — SQLite/SQLAlchemy repositories, versioned by Alembic.
-6. **Transport adapters** — a narrow `Transport` interface; deterministic in-memory implementation now, Meshtastic later.
+6. **Transport adapters** — a narrow `Transport` interface with deterministic in-memory and USB/serial Meshtastic implementations.
 7. **Updater** — future consumer of signed beta artifacts from GitHub Releases.
 
 Dependencies point inward. Domain and application code do not import FastAPI, SQLAlchemy, Meshtastic, serial, TCP, BLE, or generated protobuf types.
@@ -36,11 +36,15 @@ publish POST
 
 `InMemoryNetwork` connects virtual endpoints, records attempts, can deterministically drop frames, and can replay captured frames. It supplies the same addressing and byte boundary expected from the future Meshtastic adapter while avoiding simulated routing logic. `SqlAlchemySyncRepository` makes application state durable across restarts. Retry scheduling is timestamp-based rather than an in-process sleep, so interruption loses no queued work.
 
-This foundation only transfers a post to a thread already known by both nodes. Missing-thread negotiation, `WANT`/`SYNC`, fragmentation, conflict rules, channel-utilization scheduling, and hardware connectivity remain later Phase 2 tasks.
+This foundation only transfers a post to a thread already known by both nodes. Missing-thread negotiation, `WANT`/`SYNC`, fragmentation, conflict rules, and channel-utilization scheduling remain later Phase 2 tasks.
 
 ## Meshtastic boundary
 
-The future adapter maps SOLoRa frames to official `Data.payload`, initially with `PRIVATE_APP`, and maps official source/destination and queue results back to the transport interface. Meshtastic retains responsibility for `MeshPacket` routing, hop limits, packet/request IDs, and transport ACKs. SOLoRa never interprets a routing ACK as durable storage; only `COMMIT_ACK` has that meaning.
+`MeshtasticTransport` opens the official Python SDK's `SerialInterface`, publishes bytes through `sendData`, and listens only on `meshtastic.receive.data.PRIVATE_APP`. It maps numeric source/destination fields and raw payload bytes to `InboundFrame`. User traffic maps to Meshtastic `RELIABLE` priority; background work maps to `BACKGROUND`. Unicast asks Meshtastic for a routing ACK, while broadcast deliberately does not. A successful `send()` means the local SDK accepted the packet and returned a non-zero packet ID—not that a peer persisted it. Full local queues, serial exceptions, invalid SDK results, and closed adapters become `TransportError`, leaving the durable outbox responsible for later application retry.
+
+Meshtastic retains responsibility for `MeshPacket` routing, hop limits, packet/request IDs, firmware retries, and routing ACKs. Those ACKs arrive on `ROUTING_APP` and never enter the SOLoRa receiver subscribed to `PRIVATE_APP`. SOLoRa never interprets a routing ACK as durable storage; only the binary v1 `COMMIT_ACK` has that meaning. The adapter contains no retry sleeps or routing implementation.
+
+`TransportSettings` and `create_transport()` select `in-memory` or `meshtastic-serial` through configuration without changing application/domain code. The current diagnostic CLI exercises the adapter directly; wiring a long-running radio service into the web process is deferred until lifecycle and per-callback database-session ownership are specified.
 
 ## Release policy
 

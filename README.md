@@ -1,6 +1,6 @@
 # SOLoRa
 
-SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. The **Phase 2 transport foundation** adds a hardware-free two-node simulation with binary messages, durable retry, acknowledgement, and deduplication. Physical Meshtastic support, accounts, full forum synchronization, and automatic releases are not implemented yet.
+SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. **Phase 2** adds binary two-node transport, durable retry, deduplication, and an initial USB/serial Meshtastic adapter. Accounts, full forum synchronization, and automatic releases are not implemented yet.
 
 Current application version: `0.1.0` (local MVP; not a published stable release).
 
@@ -35,5 +35,24 @@ make demo-two-nodes
 ```
 
 The demo creates two temporary SQLite databases, drops Node A's first POST, advances the retry clock, delivers the resend to Node B, processes `COMMIT_ACK`, and replays the POST to prove that no duplicate is stored. It requires no radio hardware and leaves no project data behind.
+
+## Select a transport
+
+The default is hardware-free:
+
+```sh
+SOLORA_TRANSPORT=in-memory make transport-info
+```
+
+Install the optional official Meshtastic SDK before opening a USB radio:
+
+```sh
+make setup-radio
+SOLORA_MESHTASTIC_DEVICE=/dev/cu.usbmodem0001 make transport-radio
+```
+
+Programmatic construction uses `TransportSettings.from_environment()` and `create_transport()`. Supported values for `SOLORA_TRANSPORT` are `in-memory` and `meshtastic-serial`; serial settings also accept `SOLORA_MESHTASTIC_DEVICE`, `SOLORA_MESHTASTIC_CHANNEL`, and `SOLORA_MESHTASTIC_HOP_LIMIT`.
+
+See [the two-radio hardware procedure](docs/MESHTASTIC_HARDWARE_TEST.md) before connecting physical nodes.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md), [PROTOCOL.md](PROTOCOL.md), and [ROADMAP.md](ROADMAP.md) before implementing product features.

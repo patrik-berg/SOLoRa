@@ -15,7 +15,7 @@ Prefer small, focused modules. Avoid placing generated output, dependency caches
 
 ## Build, Test, and Development Commands
 
-Use `make setup` to install dependencies, `make migrate` to apply database migrations, and `make run` to build and serve the local application. Run `make dev-backend` and `make dev-frontend` in separate terminals for development. `make test`, `make lint`, `make typecheck`, and `make build` cover both applications. `make check` runs the complete pre-push suite.
+Use `make setup` to install core dependencies and `make setup-radio` when working with the optional official Meshtastic SDK. `make migrate` applies database migrations, while `make run` builds and serves the local application. Run `make dev-backend` and `make dev-frontend` in separate terminals for development. `make demo-two-nodes` verifies the virtual transport; `make transport-info` and `make transport-radio` exercise adapter selection. `make test`, `make lint`, `make typecheck`, and `make build` cover both applications. `make check` runs the complete pre-push suite.
 
 Before submitting work, run every configured formatter, linter, test suite, and build command locally. Commands should be reproducible from the repository root.
 
