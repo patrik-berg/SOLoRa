@@ -41,9 +41,9 @@ Pull requests should explain the problem and solution, list verification perform
 
 Communicate product-facing summaries in concise Swedish. Keep protocol changes synchronized with `PROTOCOL.md` and milestones with `ROADMAP.md`. Beta versions use `v0.x.x-beta.N`. Never publish or promote a stable release without explicit manual approval from the product owner.
 
-## SOLoRa Reference Projects
+## Meshtastic Sources and Reference Projects
 
-Treat Meshtastic's official [protobuf definitions](https://github.com/meshtastic/protobufs) and protocol documentation as the primary source. Verify constraints against the supported upstream version before implementation. The current definitions limit `Data.payload` to 233 bytes and identify application payloads with `PortNum`; use `PRIVATE_APP = 256` during private development unless SOLoRa later receives a registered port number.
+For every radio or transport decision, treat Meshtastic's current official [documentation](https://meshtastic.org/docs/), [protobuf definitions](https://github.com/meshtastic/protobufs), [Python SDK](https://github.com/meshtastic/python), and [firmware](https://github.com/meshtastic/firmware) behavior as authoritative. Check the versions SOLoRa supports; do not rely on remembered constants or old assumptions. If sources disagree, prefer current official protobuf/firmware definitions, then official documentation/SDK behavior, and only then third-party examples. Record the upstream tag or commit behind protocol-critical decisions.
 
 Keep the protocol layers separate:
 
@@ -55,7 +55,9 @@ Meshtastic MeshPacket: routing / ACK / hop limit
 LoRa
 ```
 
-SOLoRa owns only the application protocol inside `Data.payload`. Do not recreate Meshtastic routing, hop handling, or mesh delivery behavior. Budget every SOLoRa header and body byte within the payload limit.
+SOLoRa owns only the application protocol inside `Data.payload`. Do not recreate Meshtastic routing, hop handling, transport acknowledgements, or mesh delivery behavior. Before implementation, verify `Data.payload` limits, protobuf overhead, `PortNum`/`PRIVATE_APP`, `MeshPacket`, routing and hop limit, broadcast versus unicast, ACK/routing responses, packet/request IDs, retries, transmit-queue priorities, serial/TCP/BLE behavior, channel utilization, and airtime impact. Current upstream definitions state a 233-byte `Data.payload`, maximum hop limit 7, private port range 256–511, and `PRIVATE_APP = 256`; re-check rather than hard-coding these as timeless facts.
+
+Meshtastic ACK and SOLoRa `COMMIT_ACK` have different meanings. A Meshtastic ACK reports a transport/routing outcome. A future `COMMIT_ACK` may be sent only after SOL1 has received complete content, validated it, and committed it durably. Never infer application persistence from a transport ACK.
 
 For Meshtastic integration, synchronization, packet handling, node state, persistence, frontend status, and Linux/Raspberry Pi operation, consult these technical references when relevant:
 
@@ -63,6 +65,6 @@ For Meshtastic integration, synchronization, packet handling, node state, persis
 - [Supply Drop BBS](https://github.com/Mesh-America/supply-drop-bbs)
 - [MeshMonitor](https://github.com/bordeux/meshmonitor)
 
-Use them only to understand proven approaches and tradeoffs. Do not copy their code or architecture wholesale. SOLoRa's architecture and requirements always take precedence, including local-first behavior, persistent forum data, SOL1 authority with offline-capable clients, low airtime, the compact binary protocol, **Normal state is silent**, user-traffic priority, channel-utilization controls, peer repair, and future backup-server support.
+Use them only as secondary implementation examples for proven approaches and tradeoffs, never as authorities on Meshtastic behavior. Do not copy their code or architecture wholesale. SOLoRa's architecture and requirements always take precedence, including local-first behavior, persistent forum data, SOL1 authority with offline-capable clients, low airtime, the compact binary protocol, **Normal state is silent**, user-traffic priority, channel-utilization controls, peer repair, and future backup-server support.
 
 When a reference influences an implementation, briefly document which project was studied, the problem it clarified, and why SOLoRa selected the same or a different approach. Review licensing before reusing any code or other protected material.

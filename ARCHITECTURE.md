@@ -24,6 +24,20 @@ The production Vite build is served by FastAPI at `127.0.0.1:8000`. During devel
 
 For later node synchronization, an outbox will record committed messages before the Meshtastic adapter transmits them. Received envelopes will be deduplicated before application processing.
 
+## Radio transport boundary
+
+```text
+application sync and commit semantics
+→ SOLoRa binary codec
+→ Meshtastic transport adapter
+→ official Meshtastic API and MeshPacket routing
+→ LoRa radio
+```
+
+The domain and sync engine will not depend directly on serial, TCP, BLE, protobuf-generated types, or Meshtastic SDK callbacks. The adapter translates those official interfaces into transport events and exposes relevant queue/channel-utilization state for scheduling. Meshtastic owns mesh routing, hop limits, transport ACKs, and radio delivery; SOLoRa owns application identities, content reconstruction, validation, durable commits, deduplication, and future `COMMIT_ACK` semantics.
+
+The adapter must be replaceable with a deterministic fake for CI. Hardware validation supplements rather than replaces codec, retry-policy, and synchronization tests.
+
 ## Release policy
 
 GitHub Actions will eventually test and build immutable `v0.x.x-beta.N` artifacts. Beta publication may be automated after the pipeline is proven. Stable versions require an explicit manual approval and must never be published from an ordinary push.
