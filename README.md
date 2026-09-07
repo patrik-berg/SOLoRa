@@ -1,6 +1,6 @@
 # SOLoRa
 
-SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. **Phase 2** adds binary two-node transport, durable retry, deduplication, explicit hardware-independent forum repair, and an initial USB/serial Meshtastic adapter. Accounts, automatic synchronization scheduling, and automatic releases are not implemented yet.
+SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. **Phase 2** adds binary two-node transport, durable retry, deduplication, explicit hardware-independent forum repair, and an initial USB/serial Meshtastic adapter. **Phase 3** now has a manual beta packaging and GitHub prerelease foundation. Accounts, automatic synchronization scheduling, native installers, and the in-client updater are not implemented yet.
 
 Current application version: `0.1.0` (local MVP; not a published stable release).
 
@@ -56,5 +56,11 @@ SOLORA_MESHTASTIC_DEVICE=/dev/cu.usbmodem0001 make transport-radio
 Programmatic construction uses `TransportSettings.from_environment()` and `create_transport()`. Supported values for `SOLORA_TRANSPORT` are `in-memory` and `meshtastic-serial`; serial settings also accept `SOLORA_MESHTASTIC_DEVICE`, `SOLORA_MESHTASTIC_CHANNEL`, and `SOLORA_MESHTASTIC_HOP_LIMIT`.
 
 See [the two-radio hardware procedure](docs/MESHTASTIC_HARDWARE_TEST.md) before connecting physical nodes.
+
+## Publish a beta
+
+After the beta workflow is merged to `main`, open **Actions → Beta release → Run workflow**, enter a base such as `0.2.0`, enable the prerelease confirmation, and run it from `main`. The workflow repeats `make check`, chooses the next available `v0.2.0-beta.N`, builds a portable bundle and SHA-256 update manifest, signs their GitHub provenance, and creates a GitHub prerelease. It cannot publish Stable.
+
+The portable bundle is an early cross-platform test artifact requiring Python 3.12, not a signed native installer. Its included `BETA_README.md` explains local startup and provenance verification. Native installers, updater trust/rollback, and **Install beta** remain later Phase 3 work.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md), [PROTOCOL.md](PROTOCOL.md), and [ROADMAP.md](ROADMAP.md) before implementing product features.

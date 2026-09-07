@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from solora import __version__
 from solora.adapters.persistence.database import Database
 from solora.config import DEFAULT_FRONTEND_PATH
 from solora.config import database_url as default_database_url
@@ -27,7 +28,7 @@ def create_app(
         yield
         database.close()
 
-    application = FastAPI(title="SOLoRa", version="0.1.0", lifespan=lifespan)
+    application = FastAPI(title="SOLoRa", version=__version__, lifespan=lifespan)
     application.state.database = database
     application.add_middleware(
         CORSMiddleware,

@@ -60,4 +60,6 @@ Meshtastic retains responsibility for `MeshPacket` routing, hop limits, packet/r
 
 ## Release policy
 
-GitHub Actions will eventually build immutable `v0.x.x-beta.N` artifacts. Stable promotion always requires explicit manual approval.
+The manually dispatched beta workflow runs only from `main`, repeats the complete verification suite, calculates the next tag for an explicitly selected `0.x.x` base, and publishes an immutable `v0.x.x-beta.N` GitHub prerelease. Its platform-neutral bundle contains the Python wheel/source, built frontend, migrations, documentation, and a local launcher. A machine-readable manifest binds the version and source commit to the bundle's SHA-256 digest; GitHub Actions also creates signed build-provenance attestations.
+
+This is a delivery foundation, not the final updater trust model or a native installer. Native code signing, rollback, database backup, and in-client installation require separate designs. The workflow has no push, tag, schedule, or Stable-release trigger. Stable promotion always requires explicit manual product-owner approval and a separate release path.

@@ -5,6 +5,7 @@
 
 # Generated output and dependency caches
 dist/
+release/
 build/
 coverage/
 .coverage
