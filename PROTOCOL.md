@@ -1,49 +1,44 @@
 # Protocol
 
-Status: **design draft; no compatibility guarantee yet**.
+Status: **experimental v1 implemented for the Phase 2 virtual transport**. It is not yet a stable compatibility contract.
 
-Phase 1 is local-only and does not encode, transmit, or receive protocol messages. Creating threads and posts therefore produces no radio traffic. This document remains a boundary for Phase 2 rather than an implemented wire contract.
-
-SOLoRa application messages will be independent of Meshtastic's transport API. A versioned envelope is planned with these logical fields:
-
-- `version`: protocol schema version
-- `message_id`: globally unique identifier used for deduplication
-- `message_type`: operation such as thread or post creation
-- `origin_node`: stable sender identifier
-- `created_at`: UTC timestamp
-- `thread_id`: related discussion thread when applicable
-- `payload`: type-specific content
-
-The encoded representation must respect Meshtastic payload limits. Chunking, acknowledgement, retry, ordering, expiry, and conflict behavior will be specified only after measurements on two real nodes.
-
-## Meshtastic transport boundary
+## Transport boundary
 
 ```text
 SOLoRa application protocol
 → SOLoRa compact binary messages
-→ Meshtastic Data.payload
+→ Meshtastic Data.payload (PortNum PRIVATE_APP during development)
 → Meshtastic MeshPacket / routing
 → LoRa
 ```
 
-SOLoRa uses Meshtastic as transport and must not duplicate its routing, hop handling, or link-level delivery behavior. The transport adapter will place SOLoRa bytes in `Data.payload` using the appropriate `PortNum`; private development currently targets `PRIVATE_APP = 256`. Current official definitions specify a 233-byte maximum payload, a maximum hop limit of 7, and private port numbers 256–511. These are upstream constraints, not permanent SOLoRa constants: verify them against the supported official protobuf/firmware version before every protocol change.
+Meshtastic owns addressing, routing, hop limits, its transmit queue, and transport ACKs. SOLoRa owns application message IDs, persistence, deduplication, retries awaiting durable application acknowledgement, and later synchronization semantics. A Meshtastic ACK is only a routing result; a SOLoRa `COMMIT_ACK` means the receiver committed the complete item to SQLite.
 
-Frame design must budget SOLoRa headers, content, and any fragmentation metadata within the actual `Data.payload` limit. Design work must also measure protobuf overhead and airtime and account for broadcast versus unicast, packet/request IDs, device queue priorities, channel utilization, and observed serial/TCP/BLE behavior.
+## Version 1 envelope
 
-## Acknowledgement semantics
+All integers use network byte order. A complete frame must fit in the current official 233-byte `Data.payload` maximum.
 
-- **Meshtastic ACK or routing response** reports a transport/routing result. It does not prove that SOL1 has reconstructed, validated, or stored the content.
-- **SOLoRa `COMMIT_ACK`** is a future application message. SOL1 may emit it only after receiving all required content, validating it, and completing the durable database transaction.
+| Offset | Size | Field |
+| --- | ---: | --- |
+| 0 | 1 | protocol version (high nibble), message type (low nibble) |
+| 1 | 12 | non-zero 96-bit `message_id` |
+| 13 | 12 | `correlation_id`; zero except for acknowledgements |
+| 25 | 0–208 | type-specific payload |
 
-SOLoRa application retries will eventually wait for `COMMIT_ACK` without recreating Meshtastic's own packet retry mechanism. Packet IDs and request IDs belong to the transport correlation layer; SOLoRa message IDs provide application-level idempotency and deduplication. Exact retry and timeout policy remains a measured Phase 2 design decision.
+Implemented types are `POST = 1` and `COMMIT_ACK = 2`; `WANT = 3` and `SYNC = 4` are reserved. A `POST` payload is a four-byte unsigned thread ID followed by 1–204 bytes of UTF-8 body text. `COMMIT_ACK` has no payload and correlates to the committed POST. This first version deliberately supports only single-frame posts; fragmentation and complete forum synchronization are deferred.
 
-## Compatibility rules
+Message IDs are generated locally from 12 cryptographically random bytes. The receiver stores each accepted ID in `received_messages` in the same transaction as the post. Replays therefore do not create duplicates, but still receive a `COMMIT_ACK` so a lost acknowledgement can recover.
 
-- Unknown message types must be ignored safely, not crash a node.
-- Duplicate `message_id` values must be idempotent.
-- Parsers must reject malformed or oversized input before persistence.
-- Protocol fixtures must accompany every wire-format change.
-- Secrets, credentials, and private keys must never be carried in application messages.
-- Protocol decisions must cite the checked official Meshtastic version or commit.
+## Outbox and retries
 
-Security properties such as signing or encryption beyond the transport layer remain an explicit design decision for a later phase.
+Publishing through the sync service commits the post and encoded frame to SQLite together. Due user traffic is sent before background traffic. An unsuccessful or unacknowledged frame remains in the outbox and is retried after 2, 4, 8… seconds, capped at two minutes. There are no heartbeats or idle polling: **Normal state is silent**. An ACK only removes an item when its source matches the intended destination.
+
+## Validation and compatibility
+
+Parsers reject unknown versions/types, zero or malformed IDs, invalid UTF-8, invalid thread IDs, illegal correlations, and frames over 233 bytes before persistence. Every wire change requires updated fixtures under `protocol/fixtures/` and must retain safe handling of duplicates and malformed input.
+
+## Sources checked for v1
+
+Authoritative upstream checks on 2026-09-07 used Meshtastic protobuf commit `f008c45` (`mesh.proto`, `portnums.proto`) and Meshtastic Python commit `0539a96`. They confirm the current 233-byte payload limit, private PortNum range 256–511 with `PRIVATE_APP = 256`, and SDK ownership of packet IDs, destination, hop limit, ACK request, and queue priority. Recheck current official definitions before implementing the hardware adapter.
+
+Secondary implementation references were TC2-BBS-mesh (`295fb35`), Supply Drop BBS (`4b008ae`), and MeshMonitor (`17c412b`). Supply Drop reinforced separating the application core from transports. TC2 demonstrated persisted IDs, SQLite, and serial/TCP operation, but SOLoRa chose compact binary frames and a durable scheduled outbox instead of delimiter text, fixed character chunks, or sleeps. MeshMonitor demonstrated official protobuf/PortNum dispatch; its node/status patterns remain for later work. No reference code or architecture was copied.

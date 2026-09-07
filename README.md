@@ -1,6 +1,6 @@
 # SOLoRa
 
-SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. Meshtastic, accounts, node synchronization, and automatic releases are deliberately not implemented yet.
+SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. The **Phase 2 transport foundation** adds a hardware-free two-node simulation with binary messages, durable retry, acknowledgement, and deduplication. Physical Meshtastic support, accounts, full forum synchronization, and automatic releases are not implemented yet.
 
 Current application version: `0.1.0` (local MVP; not a published stable release).
 
@@ -25,5 +25,15 @@ make run
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Stop the server with `Ctrl+C`. Forum data is stored in `data/solora.db` and survives restarts. Back up that file while SOLoRa is stopped.
 
 For development, run `make dev-backend` and `make dev-frontend` in separate terminals, then open [http://127.0.0.1:5173](http://127.0.0.1:5173). Run `make check` before committing; it performs formatting checks, linting, type checks, tests, and production builds.
+
+## Test two virtual nodes
+
+After `make setup`, run:
+
+```sh
+make demo-two-nodes
+```
+
+The demo creates two temporary SQLite databases, drops Node A's first POST, advances the retry clock, delivers the resend to Node B, processes `COMMIT_ACK`, and replays the POST to prove that no duplicate is stored. It requires no radio hardware and leaves no project data behind.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md), [PROTOCOL.md](PROTOCOL.md), and [ROADMAP.md](ROADMAP.md) before implementing product features.

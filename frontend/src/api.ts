@@ -7,6 +7,7 @@ export type ThreadSummary = {
 
 export type Post = {
   id: number
+  message_id: string
   thread_id: number
   body: string
   created_at: string

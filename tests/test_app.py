@@ -5,7 +5,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 from solora.app import create_app
 
@@ -16,10 +16,10 @@ def _database_url(tmp_path: Path) -> str:
     return f"sqlite:///{tmp_path / 'solora-test.db'}"
 
 
-def _migrate(database_url: str) -> None:
+def _migrate(database_url: str, revision: str = "head") -> None:
     config = Config(ROOT / "backend" / "alembic.ini")
     config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(config, "head")
+    command.upgrade(config, revision)
 
 
 def test_migration_creates_forum_schema(tmp_path: Path) -> None:
@@ -28,7 +28,30 @@ def test_migration_creates_forum_schema(tmp_path: Path) -> None:
     _migrate(database_url)
 
     tables = inspect(create_engine(database_url)).get_table_names()
-    assert set(tables) >= {"alembic_version", "threads", "posts"}
+    assert set(tables) >= {
+        "alembic_version",
+        "threads",
+        "posts",
+        "outbox",
+        "received_messages",
+    }
+
+
+def test_transport_migration_preserves_existing_posts(tmp_path: Path) -> None:
+    database_url = _database_url(tmp_path)
+    _migrate(database_url, "20260907_0001")
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO threads (title) VALUES ('Befintlig tråd')"))
+        connection.execute(text("INSERT INTO posts (thread_id, body) VALUES (1, 'Sparad text')"))
+
+    _migrate(database_url)
+
+    with engine.connect() as connection:
+        saved = connection.execute(
+            text("SELECT body, length(message_id) FROM posts WHERE id = 1")
+        ).one()
+    assert saved == ("Sparad text", 12)
 
 
 def test_forum_api_persists_threads_and_posts(tmp_path: Path) -> None:
@@ -53,9 +76,11 @@ def test_forum_api_persists_threads_and_posts(tmp_path: Path) -> None:
         )
         assert posted.status_code == 201
         assert posted.json()["body"] == "Första inlägget"
+        assert len(posted.json()["message_id"]) == 24
 
         second_post = client.post(f"/api/threads/{thread_id}/posts", json={"body": "Ett svar"})
         assert second_post.status_code == 201
+        assert second_post.json()["message_id"] != posted.json()["message_id"]
 
         detail = client.get(f"/api/threads/{thread_id}")
         assert detail.status_code == 200

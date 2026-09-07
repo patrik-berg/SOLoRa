@@ -1,8 +1,8 @@
 # Protocol workspace
 
-This directory will hold machine-readable schemas and byte-level fixtures once the two-node transport phase begins. `PROTOCOL.md` remains the normative design document.
+`PROTOCOL.md` is the normative human-readable specification for the experimental SOLoRa v1 application envelope.
 
-- `schemas/` is reserved for versioned application-envelope schemas.
-- `fixtures/` is reserved for compact encoded examples and malformed-input cases.
+- `fixtures/` contains canonical hexadecimal frames used by automated compatibility tests.
+- `schemas/` is reserved for future machine-readable schemas if they add value; the current fixed binary layout is implemented directly by the codec.
 
-No Meshtastic integration or stable wire format exists in Phase 0.
+Fixture names follow `v<version>-<message-type>.hex`. Files contain lowercase hexadecimal bytes followed by a newline. Update the codec, normative documentation, fixtures, and tests together whenever the wire format changes.

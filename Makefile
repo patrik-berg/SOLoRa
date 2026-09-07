@@ -1,4 +1,4 @@
-.PHONY: setup migrate run dev-backend dev-frontend test lint format typecheck build check
+.PHONY: setup migrate run demo-two-nodes dev-backend dev-frontend test lint format typecheck build check
 
 UV := $(if $(wildcard .tools/bin/uv),.tools/bin/uv,uv)
 UV_CACHE_DIR ?= /tmp/solora-uv-cache
@@ -15,6 +15,9 @@ migrate:
 
 run: build migrate
 	$(UV) run uvicorn solora.app:app --app-dir backend/src --host 127.0.0.1 --port 8000
+
+demo-two-nodes:
+	$(UV) run python -m solora.demo_two_nodes
 
 dev-backend: migrate
 	$(UV) run uvicorn solora.app:app --app-dir backend/src --reload

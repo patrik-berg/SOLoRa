@@ -20,9 +20,14 @@
 
 ## Phase 2 — Two-node transport
 
-- Define the first measured wire format.
-- Connect two Meshtastic nodes through an adapter.
-- Add deduplication, retry, offline outbox, and hardware-free integration tests.
+- **Status: transport foundation implemented; physical-radio validation remains.**
+- [x] Define a compact, versioned single-frame packet envelope.
+- [x] Add 96-bit message IDs, transactional deduplication, and `COMMIT_ACK` semantics.
+- [x] Persist an offline outbox with user-first priority and bounded exponential retry.
+- [x] Simulate loss, resend, duplicate delivery, acknowledgement, and restart with two virtual nodes.
+- [ ] Connect two physical Meshtastic nodes through an adapter using official protobuf/SDK behavior.
+- [ ] Measure real payload overhead, airtime, queue behavior, ACKs, and channel utilization.
+- [ ] Design missing-thread repair, `WANT`/`SYNC`, fragmentation, and wider forum synchronization.
 
 ## Phase 3 — Beta delivery
 

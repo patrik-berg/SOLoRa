@@ -12,6 +12,7 @@ class Post:
     thread_id: int
     body: str
     created_at: datetime
+    message_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

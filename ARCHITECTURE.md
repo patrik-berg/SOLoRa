@@ -2,42 +2,46 @@
 
 ## Principles
 
-SOLoRa is local-first: core reading and writing must work without internet access. Radio and persistence details stay behind interfaces so automated tests never require physical hardware. The web client and local API are separate build targets with a narrow HTTP boundary.
+SOLoRa is local-first: reading and writing remain available without internet or radio connectivity. Persistence and transport stay behind application interfaces so CI can exercise all synchronization behavior without hardware. **Normal state is silent**, and queued user content always precedes future background repair traffic.
 
 ## Components
 
-1. **Web client** — React and TypeScript built by Vite. It owns presentation state only.
-2. **API layer** — FastAPI routes and Pydantic request/response schemas.
-3. **Application layer** — framework-independent thread and post use cases and validation.
-4. **Domain layer** — transport-independent models and invariants.
-5. **Persistence adapter** — SQLite through SQLAlchemy, versioned by Alembic migrations.
-6. **Transport adapter** — planned Meshtastic I/O behind a narrow interface; not implemented in Phase 1.
-7. **Updater** — later consumes signed beta metadata and artifacts from GitHub Releases.
+1. **Web client** — React/TypeScript built by Vite; presentation state only.
+2. **API layer** — FastAPI routes and Pydantic HTTP schemas.
+3. **Application layer** — forum use cases plus the hardware-independent `SyncNode` orchestration service.
+4. **Domain layer** — forum entities and the compact binary packet codec.
+5. **Persistence adapters** — SQLite/SQLAlchemy repositories, versioned by Alembic.
+6. **Transport adapters** — a narrow `Transport` interface; deterministic in-memory implementation now, Meshtastic later.
+7. **Updater** — future consumer of signed beta artifacts from GitHub Releases.
 
-Dependencies point inward: web, database, and radio adapters may depend on application interfaces; the domain must not import FastAPI, SQLAlchemy, or Meshtastic.
+Dependencies point inward. Domain and application code do not import FastAPI, SQLAlchemy, Meshtastic, serial, TCP, BLE, or generated protobuf types.
 
-## Initial data flow
+## Local application flow
 
 `React client → local FastAPI API → application use case → SQLite`
 
-The production Vite build is served by FastAPI at `127.0.0.1:8000`. During development, Vite proxies `/api` and `/health` to FastAPI. The default database is `data/solora.db`; `SOLORA_DATABASE_URL` can override it for tests or controlled deployments. Migrations must run before the server starts and are never replaced with implicit table creation.
+FastAPI serves the production frontend at `127.0.0.1:8000`. The default database is `data/solora.db`, overridable with `SOLORA_DATABASE_URL`. Alembic migrations must run before startup.
 
-For later node synchronization, an outbox will record committed messages before the Meshtastic adapter transmits them. Received envelopes will be deduplicated before application processing.
-
-## Radio transport boundary
+## Phase 2 transport flow
 
 ```text
-application sync and commit semantics
-→ SOLoRa binary codec
-→ Meshtastic transport adapter
-→ official Meshtastic API and MeshPacket routing
-→ LoRa radio
+publish POST
+→ transaction: local post + encoded outbox item
+→ flush due user-priority work
+→ Transport.send(destination, bytes, priority)
+→ receiver transaction: dedupe ID + persist post
+→ COMMIT_ACK
+→ sender removes matching outbox item
 ```
 
-The domain and sync engine will not depend directly on serial, TCP, BLE, protobuf-generated types, or Meshtastic SDK callbacks. The adapter translates those official interfaces into transport events and exposes relevant queue/channel-utilization state for scheduling. Meshtastic owns mesh routing, hop limits, transport ACKs, and radio delivery; SOLoRa owns application identities, content reconstruction, validation, durable commits, deduplication, and future `COMMIT_ACK` semantics.
+`InMemoryNetwork` connects virtual endpoints, records attempts, can deterministically drop frames, and can replay captured frames. It supplies the same addressing and byte boundary expected from the future Meshtastic adapter while avoiding simulated routing logic. `SqlAlchemySyncRepository` makes application state durable across restarts. Retry scheduling is timestamp-based rather than an in-process sleep, so interruption loses no queued work.
 
-The adapter must be replaceable with a deterministic fake for CI. Hardware validation supplements rather than replaces codec, retry-policy, and synchronization tests.
+This foundation only transfers a post to a thread already known by both nodes. Missing-thread negotiation, `WANT`/`SYNC`, fragmentation, conflict rules, channel-utilization scheduling, and hardware connectivity remain later Phase 2 tasks.
+
+## Meshtastic boundary
+
+The future adapter maps SOLoRa frames to official `Data.payload`, initially with `PRIVATE_APP`, and maps official source/destination and queue results back to the transport interface. Meshtastic retains responsibility for `MeshPacket` routing, hop limits, packet/request IDs, and transport ACKs. SOLoRa never interprets a routing ACK as durable storage; only `COMMIT_ACK` has that meaning.
 
 ## Release policy
 
-GitHub Actions will eventually test and build immutable `v0.x.x-beta.N` artifacts. Beta publication may be automated after the pipeline is proven. Stable versions require an explicit manual approval and must never be published from an ordinary push.
+GitHub Actions will eventually build immutable `v0.x.x-beta.N` artifacts. Stable promotion always requires explicit manual approval.

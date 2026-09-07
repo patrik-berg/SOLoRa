@@ -44,6 +44,7 @@ def _post(post: Post) -> PostResponse:
         thread_id=post.thread_id,
         body=post.body,
         created_at=post.created_at,
+        message_id=post.message_id,
     )
 
 
