@@ -11,11 +11,12 @@
 
 ## Phase 1 — Local MVP
 
+- **Status: complete.** Final browser, persistence, accessibility, responsive-layout, and CI quality pass completed.
 - [x] Add SQLite migrations and repositories.
 - [x] Create, list, and display local forum threads and posts.
 - [x] Connect the React interface to the local API.
 - [x] Prove restart persistence and migration behavior in automated tests.
-- [ ] Perform broader accessibility and usability testing before Phase 2.
+- [x] Perform browser-based accessibility and usability testing before Phase 2.
 
 ## Phase 2 — Two-node transport
 

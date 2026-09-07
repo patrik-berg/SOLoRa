@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 
 import {
   createPost,
@@ -23,6 +23,7 @@ export default function App() {
   const [newPost, setNewPost] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const threadButtons = useRef(new Map<number, HTMLButtonElement>())
 
   async function refreshThreads() {
     setThreads(await listThreads())
@@ -74,6 +75,12 @@ export default function App() {
     }
   }
 
+  function closeThread() {
+    const threadId = selectedThread?.id
+    setSelectedThread(null)
+    if (threadId !== undefined) threadButtons.current.get(threadId)?.focus()
+  }
+
   return (
     <div className="app-shell">
       <header>
@@ -117,6 +124,10 @@ export default function App() {
                 className={selectedThread?.id === thread.id ? 'thread-link active' : 'thread-link'}
                 key={thread.id}
                 onClick={() => void openThread(thread.id)}
+                ref={(element) => {
+                  if (element) threadButtons.current.set(thread.id, element)
+                  else threadButtons.current.delete(thread.id)
+                }}
                 type="button"
               >
                 <strong>{thread.title}</strong>
@@ -137,6 +148,9 @@ export default function App() {
             <>
               <div className="conversation-heading">
                 <div>
+                  <button className="back-button" onClick={closeThread} type="button">
+                    <span aria-hidden="true">←</span> Tillbaka till trådar
+                  </button>
                   <p className="eyebrow">Tråd #{selectedThread.id}</p>
                   <h2>{selectedThread.title}</h2>
                 </div>
