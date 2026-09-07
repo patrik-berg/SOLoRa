@@ -16,6 +16,12 @@ SOLoRa is local-first: reading and writing remain available without internet or 
 
 Dependencies point inward. Domain and application code do not import FastAPI, SQLAlchemy, Meshtastic, serial, TCP, BLE, or generated protobuf types.
 
+## Protocol allocation policy
+
+`PROTOCOL.md` is the authoritative SOLoRa message registry. The v1 envelope has a four-bit type field, so its small `0–15` namespace must not be allocated ad hoc in implementation code. Existing numeric meanings are immutable; removed values are not reused. A planned or reserved value becomes implemented only through a focused protocol change that defines its direction, priority, payload layout, size limits, failure behavior, canonical fixture, and compatibility tests. Value 15 remains reserved for future core expansion, with no extension encoding defined yet.
+
+Registry entries describe intent without activating behavior. In particular, reserved status, presence, authentication, fragmentation, and capability types must not be emitted or accepted until their separate designs are approved. New background behavior must preserve **Normal state is silent**, prefer piggybacking, and remain subordinate to user traffic.
+
 ## Local application flow
 
 `React client → local FastAPI API → application use case → SQLite`

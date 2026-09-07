@@ -25,16 +25,32 @@ All integers use network byte order. A complete frame must fit in the current of
 | 13 | 12 | `correlation_id`; zero except for acknowledgements |
 | 25 | 0–208 | type-specific payload |
 
-The v1 message types are:
+## Version 1 message registry
 
-| Value | Name | Payload |
-| ---: | --- | --- |
-| 1 | `POST` | legacy local thread ID plus UTF-8 body; decoded for compatibility |
-| 2 | `COMMIT_ACK` | empty; `correlation_id` names the durably processed frame |
-| 3 | `WANT` | one to 16 typed 13-byte object references |
-| 4 | `SYNC` | flags byte plus up to 15 typed object references |
-| 5 | `THREAD` | UTF-8 title; envelope ID is the global thread ID |
-| 6 | `SYNC_POST` | 12-byte global thread ID plus UTF-8 body |
+The high nibble of byte 0 is the protocol version and the low nibble is the message type, so v1 has exactly 16 numeric slots. Values are allocated centrally in this table and are immutable once published. `Planned` and `reserved` values are documentation only: v1 decoders must continue to reject them until an implementation adds codecs, fixtures, validation, and tests. Removed types are never renumbered or reused.
+
+| Value | Symbolic name | Status | Normal direction | Priority class | Short purpose |
+| ---: | --- | --- | --- | --- | --- |
+| 0 | — | Invalid | — | — | Sentinel; never valid on the wire. |
+| 1 | `POST` | Implemented, legacy | Unicast | User | Compatibility frame using a node-local thread ID; no longer emitted for new synchronized posts. |
+| 2 | `COMMIT_ACK` | Implemented | Unicast reply | Control, expedited | Confirms durable application processing named by `correlation_id`; never a Meshtastic routing ACK. |
+| 3 | `WANT` | Implemented | Unicast | Background control | Requests missing typed objects advertised by a peer. |
+| 4 | `SYNC` | Implemented | Unicast | Background | Exchanges compact, paged object inventories after an explicit sync request. |
+| 5 | `THREAD` | Implemented | Unicast | Background repair | Transfers one requested immutable thread object. |
+| 6 | `SYNC_POST` | Implemented | Unicast | User or background repair | Transfers a post using its thread's global ID. |
+| 7 | `POST_FRAGMENT` | Planned | Unicast | User or background repair | Carries part of content that cannot fit one `Data.payload`; layout is not yet designed. |
+| 8 | `WANT_FRAGMENT` | Planned | Unicast | Background control | Requests missing fragments without retransmitting complete content. |
+| 9 | `STATUS` | Planned | Primarily unicast/piggybacked | Background | Conveys compact node or sync state, preferably attached to traffic already being sent. |
+| 10 | `STATUS_BEACON` | Planned | Optional broadcast | Background | Rare, minimal status advertisement when measurements justify it. |
+| 11 | `PRESENCE` | Planned | Unicast or optional broadcast | Background | Explicit presence only when useful; authenticated traffic should normally refresh `last_seen`. |
+| 12 | `AUTH_REQUEST` | Planned | Unicast | Control | Reserves the start of a future authentication exchange; security design is deferred. |
+| 13 | `AUTH_RESPONSE` | Planned | Unicast reply | Control | Reserves the response half of future authentication. |
+| 14 | `PROTOCOL_INFO` | Planned | Unicast request/reply | Control | Negotiates or reports protocol capabilities without changing the envelope version. |
+| 15 | `CORE_EXTENSION` | Reserved | — | — | Reserved core expansion slot `[15,15]`; no subtype or payload encoding is currently defined. |
+
+Priority classes describe scheduling intent, not delivery guarantees. User traffic is `POST`, newly authored `SYNC_POST`, and future `POST_FRAGMENT`; it precedes repair work. Control traffic is acknowledgement, request, negotiation, and future authentication traffic; only latency-sensitive `COMMIT_ACK` is currently expedited. Inventory, requested-object repair, status, beacons, and explicit presence are background traffic. A retransmitted or repair-sourced `SYNC_POST`/fragment remains background even though it carries user content.
+
+All implemented traffic is normally unicast. Broadcast is reserved only as an option for future small, measured `STATUS_BEACON` or `PRESENCE` frames; neither is authorized by this registry. **Normal state is silent**: no planned type creates a heartbeat requirement. Ordinary authenticated traffic should later refresh `last_seen`, `STATUS` should piggyback when possible, and any `STATUS_BEACON` must be compact, low-frequency, and governed by measured airtime/channel utilization. Authentication values reserve identifiers only; they define no security scheme.
 
 New posts use `SYNC_POST`; the legacy `POST` layout remains readable so existing queued v1 frames are not invalidated. Threads and posts use globally unique 96-bit object IDs, avoiding unsafe assumptions that separate SQLite databases assign the same local integer IDs. `COMMIT_ACK` has no payload and acknowledges durable handling of any outbox frame. Content remains single-frame: a thread title is at most 208 UTF-8 bytes and a synchronized post body at most 196. Fragmentation is deferred until physical-radio measurements justify its byte and airtime cost.
 
