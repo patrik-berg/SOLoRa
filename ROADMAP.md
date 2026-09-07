@@ -11,10 +11,11 @@
 
 ## Phase 1 — Local MVP
 
-- Add SQLite migrations and repositories.
-- Create and display one forum thread with posts.
-- Connect the accessible React interface to the local API.
-- Prove backup and migration behavior.
+- [x] Add SQLite migrations and repositories.
+- [x] Create, list, and display local forum threads and posts.
+- [x] Connect the React interface to the local API.
+- [x] Prove restart persistence and migration behavior in automated tests.
+- [ ] Perform broader accessibility and usability testing before Phase 2.
 
 ## Phase 2 — Two-node transport
 

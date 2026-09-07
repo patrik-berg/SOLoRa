@@ -15,7 +15,7 @@ Prefer small, focused modules. Avoid placing generated output, dependency caches
 
 ## Build, Test, and Development Commands
 
-Use `make setup` to install Python and frontend dependencies. Run `make dev-backend` and `make dev-frontend` for local development. `make test`, `make lint`, `make typecheck`, and `make build` cover both applications. `make check` runs the complete pre-push suite.
+Use `make setup` to install dependencies, `make migrate` to apply database migrations, and `make run` to build and serve the local application. Run `make dev-backend` and `make dev-frontend` in separate terminals for development. `make test`, `make lint`, `make typecheck`, and `make build` cover both applications. `make check` runs the complete pre-push suite.
 
 Before submitting work, run every configured formatter, linter, test suite, and build command locally. Commands should be reproducible from the repository root.
 
@@ -28,6 +28,8 @@ Target Python 3.12 and Node.js 24. Ruff controls Python formatting with 4-space 
 ## Testing Guidelines
 
 Add pytest tests with every behavior change or bug fix. Name tests after observable behavior, such as `test_rejects_expired_token`. CI enforces at least 90% coverage. Tests must be deterministic; replace network, clock, filesystem, and radio hardware dependencies with fixtures or fakes.
+
+Create every schema change as an Alembic migration. Never edit an applied migration or rely on automatic table creation; verify upgrades against an existing database so local user data is preserved.
 
 ## Commit & Pull Request Guidelines
 
