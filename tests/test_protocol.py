@@ -6,17 +6,34 @@ import pytest
 
 from solora.domain.protocol import (
     MAX_POST_BODY_BYTES,
+    MAX_SYNC_POST_BODY_BYTES,
+    MAX_SYNC_REFS,
+    MAX_WANT_REFS,
     MESHTASTIC_DATA_PAYLOAD_MAX,
     ZERO_MESSAGE_ID,
     MessageType,
+    ObjectKind,
+    ObjectRef,
     PacketEnvelope,
     ProtocolError,
     decode_post_payload,
+    decode_sync_payload,
+    decode_sync_post_payload,
+    decode_thread_payload,
+    decode_want_payload,
     encode_post_payload,
+    encode_sync_payload,
+    encode_sync_post_payload,
+    encode_thread_payload,
+    encode_want_payload,
 )
 
 MESSAGE_ID = bytes.fromhex("0102030405060708090a0b0c")
 ACK_ID = bytes.fromhex("1112131415161718191a1b1c")
+THREAD_ID = bytes.fromhex("2122232425262728292a2b2c")
+POST_ID = bytes.fromhex("3132333435363738393a3b3c")
+SYNC_ID = bytes.fromhex("4142434445464748494a4b4c")
+WANT_ID = bytes.fromhex("5152535455565758595a5b5c")
 FIXTURES = Path(__file__).resolve().parents[1] / "protocol" / "fixtures"
 
 
@@ -35,9 +52,76 @@ def test_canonical_frames_match_versioned_fixtures() -> None:
         ACK_ID,
         correlation_id=MESSAGE_ID,
     ).encode()
+    refs = (
+        ObjectRef(ObjectKind.THREAD, THREAD_ID),
+        ObjectRef(ObjectKind.POST, POST_ID),
+    )
+    thread = PacketEnvelope(
+        MessageType.THREAD,
+        THREAD_ID,
+        encode_thread_payload("Tråd"),
+    ).encode()
+    sync_post = PacketEnvelope(
+        MessageType.SYNC_POST,
+        POST_ID,
+        encode_sync_post_payload(THREAD_ID, "Hej"),
+    ).encode()
+    sync = PacketEnvelope(
+        MessageType.SYNC,
+        SYNC_ID,
+        encode_sync_payload(refs, reply_requested=True),
+    ).encode()
+    want = PacketEnvelope(
+        MessageType.WANT,
+        WANT_ID,
+        encode_want_payload(refs),
+    ).encode()
 
     assert post == _fixture("v1-post.hex")
     assert acknowledgement == _fixture("v1-commit-ack.hex")
+    assert thread == _fixture("v1-thread.hex")
+    assert sync_post == _fixture("v1-sync-post.hex")
+    assert sync == _fixture("v1-sync.hex")
+    assert want == _fixture("v1-want.hex")
+
+
+def test_sync_object_payloads_round_trip() -> None:
+    assert decode_thread_payload(encode_thread_payload("  Gemensam tråd  ")) == "Gemensam tråd"
+    assert decode_sync_post_payload(encode_sync_post_payload(THREAD_ID, "  Text  ")) == (
+        THREAD_ID,
+        "Text",
+    )
+
+
+def test_sync_and_want_reference_pages_round_trip_at_limits() -> None:
+    sync_refs = tuple(
+        ObjectRef(ObjectKind.POST, index.to_bytes(12)) for index in range(1, MAX_SYNC_REFS + 1)
+    )
+    want_refs = tuple(
+        ObjectRef(ObjectKind.POST, index.to_bytes(12)) for index in range(1, MAX_WANT_REFS + 1)
+    )
+
+    sync_payload = encode_sync_payload(sync_refs, reply_requested=True)
+    want_payload = encode_want_payload(want_refs)
+
+    assert decode_sync_payload(sync_payload) == (True, sync_refs)
+    assert decode_want_payload(want_payload) == want_refs
+    assert len(PacketEnvelope(MessageType.SYNC, SYNC_ID, sync_payload).encode()) <= 233
+    assert len(PacketEnvelope(MessageType.WANT, WANT_ID, want_payload).encode()) == 233
+
+
+def test_sync_payload_validation_rejects_malformed_data() -> None:
+    duplicate = ObjectRef(ObjectKind.THREAD, THREAD_ID)
+    with pytest.raises(ProtocolError, match="duplicates"):
+        decode_want_payload(encode_want_payload((duplicate, duplicate)))
+    with pytest.raises(ProtocolError, match="truncated"):
+        decode_sync_payload(b"\x00\x01")
+    with pytest.raises(ProtocolError, match="flags"):
+        decode_sync_payload(b"\x80")
+    with pytest.raises(ProtocolError, match="between"):
+        encode_want_payload(())
+    with pytest.raises(ProtocolError, match="maximum"):
+        encode_sync_post_payload(THREAD_ID, "x" * (MAX_SYNC_POST_BODY_BYTES + 1))
 
 
 def test_post_envelope_round_trips_at_meshtastic_limit() -> None:

@@ -24,6 +24,7 @@ def _thread_entity(record: ThreadRecord, *, include_posts: bool) -> Thread:
         id=record.id,
         title=record.title,
         created_at=record.created_at,
+        sync_id=message_id_hex(record.sync_id) if record.sync_id is not None else None,
         post_count=len(record.posts),
         posts=posts,
     )
@@ -40,6 +41,7 @@ class SqlAlchemyForumRepository:
             select(ThreadRecord)
             .options(selectinload(ThreadRecord.posts))
             .order_by(ThreadRecord.id.desc())
+            .execution_options(populate_existing=True)
         )
         records = self.session.scalars(statement).all()
         return [_thread_entity(record, include_posts=False) for record in records]
@@ -49,12 +51,13 @@ class SqlAlchemyForumRepository:
             select(ThreadRecord)
             .where(ThreadRecord.id == thread_id)
             .options(selectinload(ThreadRecord.posts))
+            .execution_options(populate_existing=True)
         )
         record = self.session.scalar(statement)
         return _thread_entity(record, include_posts=True) if record else None
 
     def create_thread(self, title: str) -> Thread:
-        record = ThreadRecord(title=title)
+        record = ThreadRecord(sync_id=new_message_id(), title=title)
         self.session.add(record)
         self.session.commit()
         self.session.refresh(record)

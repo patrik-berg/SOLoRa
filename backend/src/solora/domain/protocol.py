@@ -14,8 +14,14 @@ ZERO_MESSAGE_ID = bytes(MESSAGE_ID_SIZE)
 # correlation IDs are fixed-width so decoding never needs protobuf or JSON.
 _HEADER = struct.Struct(f"!B{MESSAGE_ID_SIZE}s{MESSAGE_ID_SIZE}s")
 _THREAD_ID = struct.Struct("!I")
+_OBJECT_REF = struct.Struct(f"!B{MESSAGE_ID_SIZE}s")
 MAX_ENVELOPE_PAYLOAD = MESHTASTIC_DATA_PAYLOAD_MAX - _HEADER.size
 MAX_POST_BODY_BYTES = MAX_ENVELOPE_PAYLOAD - _THREAD_ID.size
+MAX_SYNC_POST_BODY_BYTES = MAX_ENVELOPE_PAYLOAD - MESSAGE_ID_SIZE
+MAX_THREAD_TITLE_BYTES = MAX_ENVELOPE_PAYLOAD
+MAX_SYNC_REFS = (MAX_ENVELOPE_PAYLOAD - 1) // _OBJECT_REF.size
+MAX_WANT_REFS = MAX_ENVELOPE_PAYLOAD // _OBJECT_REF.size
+SYNC_REPLY_REQUESTED = 0x01
 
 
 class ProtocolError(ValueError):
@@ -29,6 +35,26 @@ class MessageType(IntEnum):
     COMMIT_ACK = 2
     WANT = 3
     SYNC = 4
+    THREAD = 5
+    SYNC_POST = 6
+
+
+class ObjectKind(IntEnum):
+    """Immutable object categories advertised during repair."""
+
+    THREAD = 1
+    POST = 2
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectRef:
+    """Compact globally unique reference used by SYNC and WANT."""
+
+    kind: ObjectKind
+    object_id: bytes
+
+    def __post_init__(self) -> None:
+        _validate_id(self.object_id, "object_id", allow_zero=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +146,68 @@ def decode_post_payload(payload: bytes) -> tuple[int, str]:
     return thread_id, normalized_body
 
 
+def encode_thread_payload(title: str) -> bytes:
+    """Encode a single-frame immutable thread title."""
+    return _encode_text(title, MAX_THREAD_TITLE_BYTES, "Thread title")
+
+
+def decode_thread_payload(payload: bytes) -> str:
+    """Decode a single-frame immutable thread title."""
+    return _decode_text(payload, "Thread title")
+
+
+def encode_sync_post_payload(thread_sync_id: bytes, body: str) -> bytes:
+    """Encode a post using its thread's global synchronization ID."""
+    _validate_id(thread_sync_id, "thread_sync_id", allow_zero=False)
+    return thread_sync_id + _encode_text(body, MAX_SYNC_POST_BODY_BYTES, "Post")
+
+
+def decode_sync_post_payload(payload: bytes) -> tuple[bytes, str]:
+    """Decode a post associated with a global thread ID."""
+    if len(payload) <= MESSAGE_ID_SIZE:
+        raise ProtocolError("SYNC_POST payload is incomplete")
+    thread_sync_id = payload[:MESSAGE_ID_SIZE]
+    _validate_id(thread_sync_id, "thread_sync_id", allow_zero=False)
+    return thread_sync_id, _decode_text(payload[MESSAGE_ID_SIZE:], "Post")
+
+
+def encode_sync_payload(
+    refs: tuple[ObjectRef, ...],
+    *,
+    reply_requested: bool,
+) -> bytes:
+    """Encode one inventory page; callers split larger inventories."""
+    if len(refs) > MAX_SYNC_REFS:
+        raise ProtocolError(f"SYNC carries at most {MAX_SYNC_REFS} object references")
+    flags = SYNC_REPLY_REQUESTED if reply_requested else 0
+    return bytes([flags]) + _encode_refs(refs)
+
+
+def decode_sync_payload(payload: bytes) -> tuple[bool, tuple[ObjectRef, ...]]:
+    """Decode one inventory page and its response request flag."""
+    if not payload or payload[0] & ~SYNC_REPLY_REQUESTED:
+        raise ProtocolError("Invalid SYNC flags")
+    refs = _decode_refs(payload[1:])
+    if len(refs) > MAX_SYNC_REFS:
+        raise ProtocolError("SYNC contains too many object references")
+    return bool(payload[0] & SYNC_REPLY_REQUESTED), refs
+
+
+def encode_want_payload(refs: tuple[ObjectRef, ...]) -> bytes:
+    """Encode requested object references."""
+    if not refs or len(refs) > MAX_WANT_REFS:
+        raise ProtocolError(f"WANT carries between 1 and {MAX_WANT_REFS} references")
+    return _encode_refs(refs)
+
+
+def decode_want_payload(payload: bytes) -> tuple[ObjectRef, ...]:
+    """Decode requested object references."""
+    refs = _decode_refs(payload)
+    if not refs or len(refs) > MAX_WANT_REFS:
+        raise ProtocolError("Invalid WANT reference count")
+    return refs
+
+
 def message_id_hex(message_id: bytes) -> str:
     """Return the stable API/log representation of an application ID."""
     _validate_id(message_id, "message_id", allow_zero=False)
@@ -131,3 +219,46 @@ def _validate_id(value: bytes, name: str, *, allow_zero: bool) -> None:
         raise ProtocolError(f"{name} must be {MESSAGE_ID_SIZE} bytes")
     if not allow_zero and value == ZERO_MESSAGE_ID:
         raise ProtocolError(f"{name} must not be zero")
+
+
+def _encode_refs(refs: tuple[ObjectRef, ...]) -> bytes:
+    return b"".join(_OBJECT_REF.pack(int(ref.kind), ref.object_id) for ref in refs)
+
+
+def _decode_refs(payload: bytes) -> tuple[ObjectRef, ...]:
+    if len(payload) % _OBJECT_REF.size:
+        raise ProtocolError("Object reference list is truncated")
+    refs: list[ObjectRef] = []
+    for offset in range(0, len(payload), _OBJECT_REF.size):
+        kind_value, object_id = _OBJECT_REF.unpack_from(payload, offset)
+        try:
+            kind = ObjectKind(kind_value)
+        except ValueError as error:
+            raise ProtocolError("Unknown object kind") from error
+        refs.append(ObjectRef(kind, object_id))
+    if len(set(refs)) != len(refs):
+        raise ProtocolError("Object reference list contains duplicates")
+    return tuple(refs)
+
+
+def _encode_text(value: str, maximum: int, label: str) -> bytes:
+    normalized = value.strip()
+    if not normalized:
+        raise ProtocolError(f"{label} must not be empty")
+    encoded = normalized.encode("utf-8")
+    if len(encoded) > maximum:
+        raise ProtocolError(f"{label} requires {len(encoded)} bytes; maximum is {maximum}")
+    return encoded
+
+
+def _decode_text(payload: bytes, label: str) -> str:
+    if not payload:
+        raise ProtocolError(f"{label} must not be empty")
+    try:
+        decoded = payload.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ProtocolError(f"{label} is not valid UTF-8") from error
+    normalized = decoded.strip()
+    if not normalized:
+        raise ProtocolError(f"{label} must not be empty")
+    return normalized

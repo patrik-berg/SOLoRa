@@ -34,6 +34,7 @@ def test_migration_creates_forum_schema(tmp_path: Path) -> None:
         "posts",
         "outbox",
         "received_messages",
+        "repair_requests",
     }
 
 
@@ -48,10 +49,14 @@ def test_transport_migration_preserves_existing_posts(tmp_path: Path) -> None:
     _migrate(database_url)
 
     with engine.connect() as connection:
-        saved = connection.execute(
+        saved_post = connection.execute(
             text("SELECT body, length(message_id) FROM posts WHERE id = 1")
         ).one()
-    assert saved == ("Sparad text", 12)
+        saved_thread = connection.execute(
+            text("SELECT title, length(sync_id) FROM threads WHERE id = 1")
+        ).one()
+    assert saved_post == ("Sparad text", 12)
+    assert saved_thread == ("Befintlig tråd", 12)
 
 
 def test_forum_api_persists_threads_and_posts(tmp_path: Path) -> None:

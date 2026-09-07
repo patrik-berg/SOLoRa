@@ -8,6 +8,7 @@ from alembic import command
 from alembic.config import Config
 
 from solora.adapters.persistence.database import Database
+from solora.adapters.persistence.records import ThreadRecord
 from solora.adapters.persistence.repository import SqlAlchemyForumRepository
 from solora.adapters.persistence.sync_repository import SqlAlchemySyncRepository
 from solora.adapters.transport.in_memory import InMemoryNetwork
@@ -49,8 +50,13 @@ def run_demo() -> None:
         clock = DemoClock()
 
         with database_a.sessions() as session_a, database_b.sessions() as session_b:
-            SqlAlchemyForumRepository(session_a).create_thread("Virtuell radiotråd")
+            shared_thread = SqlAlchemyForumRepository(session_a).create_thread("Virtuell radiotråd")
             SqlAlchemyForumRepository(session_b).create_thread("Virtuell radiotråd")
+            receiver_thread = session_b.get(ThreadRecord, 1)
+            if receiver_thread is None or shared_thread.sync_id is None:
+                raise RuntimeError("Demo thread setup failed")
+            receiver_thread.sync_id = bytes.fromhex(shared_thread.sync_id)
+            session_b.commit()
             node_a = SyncNode(
                 SqlAlchemySyncRepository(session_a), network.connect(0xA), clock=clock
             )
@@ -83,7 +89,7 @@ def run_demo() -> None:
                 for transmission in network.transmissions
                 if transmission.delivered
                 and PacketEnvelope.decode(transmission.frame.payload).message_type
-                is MessageType.POST
+                is MessageType.SYNC_POST
             )
             network.replay(delivered_post)
             thread_b = SqlAlchemyForumRepository(session_b).get_thread(1)

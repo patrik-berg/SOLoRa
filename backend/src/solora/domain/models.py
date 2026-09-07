@@ -24,3 +24,4 @@ class Thread:
     created_at: datetime
     post_count: int = 0
     posts: tuple[Post, ...] = field(default_factory=tuple)
+    sync_id: str | None = None

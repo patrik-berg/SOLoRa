@@ -36,7 +36,13 @@ publish POST
 
 `InMemoryNetwork` connects virtual endpoints, records attempts, can deterministically drop frames, and can replay captured frames. It supplies the same addressing and byte boundary expected from the future Meshtastic adapter while avoiding simulated routing logic. `SqlAlchemySyncRepository` makes application state durable across restarts. Retry scheduling is timestamp-based rather than an in-process sleep, so interruption loses no queued work.
 
-This foundation only transfers a post to a thread already known by both nodes. Missing-thread negotiation, `WANT`/`SYNC`, fragmentation, conflict rules, and channel-utilization scheduling remain later Phase 2 tasks.
+## Hardware-independent repair
+
+Each thread now has a random 96-bit `sync_id`; posts already use 96-bit message IDs. Local SQLite primary keys never cross the transport boundary. An explicit `request_sync(peer)` queues compact inventory pages in the same durable outbox as content. The peer compares object references, persists outstanding repair requests, returns its inventory once, and asks for missing threads/posts with `WANT`. Requested objects are loaded from SQLite and queued as background `THREAD` or `SYNC_POST` frames.
+
+Thread and post persistence remains idempotent by global ID. A post whose thread is unavailable is not marked received and is not acknowledged. Its thread is requested once; after the thread commits, the sender's existing retry delivers the post without special timing. Control messages and content are application-acknowledged, so loss or process restart leaves enough durable state to resume. Inventory and repair traffic uses `BACKGROUND`; user-originated posts and all acknowledgements retain higher priority.
+
+Repair is pull-based and silent until explicitly requested. It currently supports immutable thread titles and posts that fit one radio frame. Fragmentation, conflict rules, automatic sync scheduling, and channel-utilization scheduling remain later Phase 2 work and require physical measurements.
 
 ## Meshtastic boundary
 

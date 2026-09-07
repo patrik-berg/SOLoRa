@@ -1,6 +1,6 @@
 # SOLoRa
 
-SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. **Phase 2** adds binary two-node transport, durable retry, deduplication, and an initial USB/serial Meshtastic adapter. Accounts, full forum synchronization, and automatic releases are not implemented yet.
+SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. **Phase 2** adds binary two-node transport, durable retry, deduplication, explicit hardware-independent forum repair, and an initial USB/serial Meshtastic adapter. Accounts, automatic synchronization scheduling, and automatic releases are not implemented yet.
 
 Current application version: `0.1.0` (local MVP; not a published stable release).
 
@@ -35,6 +35,8 @@ make demo-two-nodes
 ```
 
 The demo creates two temporary SQLite databases, drops Node A's first POST, advances the retry clock, delivers the resend to Node B, processes `COMMIT_ACK`, and replays the POST to prove that no duplicate is stored. It requires no radio hardware and leaves no project data behind.
+
+Automated integration tests additionally start two nodes with different local forum data, take one node offline, drop a repair packet after reconnect, and verify bidirectional convergence and idempotent re-sync. Repair is initiated explicitly through `SyncNode.request_sync(peer_node_id)`; normal idle state remains silent.
 
 ## Select a transport
 
