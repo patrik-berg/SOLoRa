@@ -1,26 +1,29 @@
 # SOLoRa
 
-SOLoRa is a local-first communication application intended to combine a small web forum with Meshtastic transport. The repository is currently in **Phase 0: development foundation**. Forum, database, radio transport, updater, and production release behavior are deliberately not implemented yet.
+SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. Meshtastic, accounts, node synchronization, and automatic releases are deliberately not implemented yet.
+
+Current application version: `0.1.0` (local MVP; not a published stable release).
 
 ## Chosen stack
 
 - Python 3.12 and FastAPI for the local HTTP service
-- SQLite with SQLAlchemy and Alembic for the future persistence layer
+- SQLite with SQLAlchemy and Alembic for persistence
 - React 19, TypeScript, and Vite for the local web interface
 - Meshtastic behind a transport interface so hardware is replaceable in tests
 - pytest, Ruff, and mypy for automated verification
 - `uv` for Python and dependency management
 
-## Development
+## Start SOLoRa on macOS
 
-Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/), Node.js 24, and pnpm 11, then run:
+Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/), Node.js 24, and pnpm 11. From the repository root, run:
 
 ```sh
 make setup
-make check
-make dev
+make run
 ```
 
-Run `make dev-backend` and `make dev-frontend` in separate terminals. The backend starts at `http://127.0.0.1:8000`; the frontend starts at `http://127.0.0.1:5173`. No forum or radio functionality exists yet.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Stop the server with `Ctrl+C`. Forum data is stored in `data/solora.db` and survives restarts. Back up that file while SOLoRa is stopped.
+
+For development, run `make dev-backend` and `make dev-frontend` in separate terminals, then open [http://127.0.0.1:5173](http://127.0.0.1:5173). Run `make check` before committing; it performs formatting checks, linting, type checks, tests, and production builds.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md), [PROTOCOL.md](PROTOCOL.md), and [ROADMAP.md](ROADMAP.md) before implementing product features.

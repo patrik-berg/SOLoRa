@@ -2,6 +2,8 @@
 
 Status: **design draft; no compatibility guarantee yet**.
 
+Phase 1 is local-only and does not encode, transmit, or receive protocol messages. Creating threads and posts therefore produces no radio traffic. This document remains a boundary for Phase 2 rather than an implemented wire contract.
+
 SOLoRa application messages will be independent of Meshtastic's transport API. A versioned envelope is planned with these logical fields:
 
 - `version`: protocol schema version
