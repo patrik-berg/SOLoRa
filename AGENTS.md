@@ -40,3 +40,15 @@ Pull requests should explain the problem and solution, list verification perform
 ## Product and Release Rules
 
 Communicate product-facing summaries in concise Swedish. Keep protocol changes synchronized with `PROTOCOL.md` and milestones with `ROADMAP.md`. Beta versions use `v0.x.x-beta.N`. Never publish or promote a stable release without explicit manual approval from the product owner.
+
+## SOLoRa Reference Projects
+
+For Meshtastic integration, synchronization, packet handling, node state, persistence, frontend status, and Linux/Raspberry Pi operation, consult these technical references when relevant:
+
+- [TC2-BBS-mesh](https://github.com/TheCommsChannel/TC2-BBS-mesh)
+- [Supply Drop BBS](https://github.com/Mesh-America/supply-drop-bbs)
+- [MeshMonitor](https://github.com/bordeux/meshmonitor)
+
+Use them only to understand proven approaches and tradeoffs. Do not copy their code or architecture wholesale. SOLoRa's architecture and requirements always take precedence, including local-first behavior, persistent forum data, SOL1 authority with offline-capable clients, low airtime, the compact binary protocol, **Normal state is silent**, user-traffic priority, channel-utilization controls, peer repair, and future backup-server support.
+
+When a reference influences an implementation, briefly document which project was studied, the problem it clarified, and why SOLoRa selected the same or a different approach. Review licensing before reusing any code or other protected material.
