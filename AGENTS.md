@@ -4,8 +4,9 @@
 
 Keep the root limited to project-wide configuration and documentation. The repository is organized as follows:
 
-- `backend/src/solora/` contains the FastAPI service, domain code, and adapters.
-- `frontend/` will contain server-rendered templates and static assets.
+- `backend/src/solora/` contains the FastAPI API, domain code, and adapters.
+- `frontend/src/` contains the React/TypeScript client; keep UI tests beside components.
+- `protocol/` contains protocol design notes, schemas, and byte-level fixtures.
 - `tests/` contains cross-component and integration tests; component-local unit tests may live beside their source.
 - `.github/workflows/` contains CI and automation definitions.
 - `ARCHITECTURE.md`, `PROTOCOL.md`, and `ROADMAP.md` document system design, wire behavior, and planned work.
@@ -14,7 +15,7 @@ Prefer small, focused modules. Avoid placing generated output, dependency caches
 
 ## Build, Test, and Development Commands
 
-Use `make setup` to create the Python 3.12 environment. Run `make dev` for the local server, `make test` for pytest, `make lint` for Ruff, `make typecheck` for mypy, and `make build` for the package artifact. `make check` runs the complete pre-push suite.
+Use `make setup` to install Python and frontend dependencies. Run `make dev-backend` and `make dev-frontend` for local development. `make test`, `make lint`, `make typecheck`, and `make build` cover both applications. `make check` runs the complete pre-push suite.
 
 Before submitting work, run every configured formatter, linter, test suite, and build command locally. Commands should be reproducible from the repository root.
 
@@ -22,7 +23,7 @@ Before declaring a feature, bug fix, or substantial change complete, review ever
 
 ## Coding Style & Naming Conventions
 
-Target Python 3.12. Ruff controls formatting and linting with 4-space indentation and a 100-character line limit. Use `snake_case` for modules and functions, `PascalCase` for classes, and typed interfaces at adapter boundaries. Keep domain code independent of FastAPI, SQLAlchemy, and Meshtastic.
+Target Python 3.12 and Node.js 24. Ruff controls Python formatting with 4-space indentation and a 100-character line limit; Oxlint and TypeScript check the frontend. Use `snake_case` for Python, `PascalCase` for React components and classes, and `camelCase` for TypeScript functions. Keep domain code independent of frameworks and adapters.
 
 ## Testing Guidelines
 

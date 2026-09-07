@@ -8,6 +8,8 @@ def test_required_project_structure_exists() -> None:
     required_paths = (
         "backend/src/solora",
         "frontend",
+        "frontend/package.json",
+        "protocol/README.md",
         "README.md",
         "ARCHITECTURE.md",
         "CHECKLIST.md",
