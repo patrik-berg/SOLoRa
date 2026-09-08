@@ -44,6 +44,13 @@
 ## Phase 3 — Beta delivery
 
 - [x] Document the [desktop control window and headless delivery design](docs/PHASE3_DESKTOP_DELIVERY.md).
+- [x] Define Desktop (Windows/macOS), Server (Linux/Pi 4/5 on existing OS), and Appliance (Zero 2 W SD image) as distribution models independent of role.
+- [ ] Package Server for existing Raspberry Pi OS on Pi 4/5, preferably `.deb`, without requiring a dedicated image.
+- [ ] Produce a minimal Zero 2 W Appliance image: flash → boot → automatic service, no GUI/development tools, shared SOLoRa core.
+- [ ] Implement secure network provisioning, advertised URL/IP fallback, and explicit identity/radio/channel first-run wizard.
+- [ ] Provide `solora-config` for offline-capable identity, radio/channel, bind/port, network, diagnostics, restart, and service recovery with manual device override.
+- [ ] Validate persistent data separation, watchdog/restart, power-loss recovery, backup/restore, and safe application/database rollback; investigate read-only root only afterwards.
+- [ ] **Required Zero 2 W Primary/Backup gate:** physically measure idle RAM/CPU, startup, SQLite/web latency, sync bursts, reconnect/repair, auth, replication, temperature and sustained stability within the 512 MB target. Unimplemented auth/replication measurements remain pending.
 - [ ] Validate a thin control-window toolkit and platform packaging prototype (provisionally Python/Tkinter + PyInstaller).
 - [ ] Implement desktop status, usable URLs, interface/port Apply, Open, Hide/restore, Quit, and Start/Restart.
 - [ ] Persist Start minimized and opt-in Run at login, with platform-specific startup adapters.

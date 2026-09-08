@@ -6,6 +6,8 @@ Current application version: `0.1.0` (local MVP; not a published stable release)
 
 Phase 3 will add an installed desktop control window for service status, web addresses, interface/port changes, opening the browser, Hide/Quit, and startup preferences. The forum and advanced settings stay in the web app. A separate headless mode will support servers and Raspberry Pi without a desktop. This is planned, not yet available; see the [desktop and headless delivery design](docs/PHASE3_DESKTOP_DELIVERY.md).
 
+Planned distributions are **SOLoRa Desktop** for Windows/macOS, **SOLoRa Server** installed on existing Linux/Raspberry Pi OS (Pi 4/5, preferably `.deb`), and **SOLoRa Appliance** as a flashable headless SD image for Pi Zero 2 W. All share the same core. Hardware never selects `CLIENT`, `PRIMARY`, or `BACKUP`; roles remain explicit. Zero 2 W Primary/Backup performance and robustness are targets awaiting physical validation. The appliance will include automatic startup, browser setup, and `solora-config` recovery without a desktop.
+
 ## Chosen stack
 
 - Python 3.12 and FastAPI for the local HTTP service

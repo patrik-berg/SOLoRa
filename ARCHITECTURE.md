@@ -84,6 +84,12 @@ Meshtastic channel indices are node-local: two nodes may both use `solora-link` 
 
 ### Desktop and headless installation
 
+Distribution is separate from role: **Desktop** targets Windows/macOS; **Server** installs on existing Linux/Raspberry Pi OS on Pi 4/5, preferably via `.deb`; **Appliance** is a flashable, automatically starting headless image for Pi Zero 2 W. Linux desktop controls are optional; Zero 2 W has no desktop, Tkinter, or development tools. All use identical core, protocol, database, sync, roles, transport, and web UI; packaging and OS/recovery adapters provide the differences.
+
+Zero 2 W is the 512 MB minimum performance target for future headless Primary/Backup, never an automatic role assignment. An explicit role choice is required. Primary workload and sustained stability must pass a dedicated physical validation gate before support is claimed. Backup remains non-authoritative while a valid Primary exists; future manual promotion needs authority-generation/fencing rules, not a rename.
+
+Appliance design includes network provisioning and browser first run, independent `solora-config` recovery via local terminal/SSH, service watchdog/restart support, and persistent data separate from OS/application files. Safe rollback must cover database compatibility as well as binaries. Read-only root remains an investigation pending SQLite/logging/update validation. See the delivery design for the full recovery scope and measurement gate.
+
 Phase 3 must include a small local control window as part of the installed desktop app, alongside the existing browser-based forum. A thin shell over a local supervisor displays service readiness, web addresses, interface/port, app version, system name/role, and cached Meshtastic status. It supports Open SOLoRa, Hide/restore, Quit, Start/Restart, applying bind/port changes, Start minimized, and opt-in Run at login. Advanced configuration remains in the web app.
 
 The supervisor owns the desktop backend child and remains usable when HTTP fails. Local process control must be independent of the configurable HTTP listener. Headless mode instead uses an OS service manager and equivalent status/configuration controls, with no GUI dependency. One owner per data profile prevents duplicate services and radio connections. Name, role, and Node ID retain their independent meanings.
