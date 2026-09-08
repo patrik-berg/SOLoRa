@@ -659,6 +659,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "meshtastic" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -671,16 +672,13 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
-radio = [
-    { name = "meshtastic" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.15,<2" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx2", marker = "extra == 'dev'", specifier = ">=2.12,<3" },
-    { name = "meshtastic", marker = "extra == 'radio'", specifier = ">=2.7.11,<2.8" },
+    { name = "meshtastic", specifier = ">=2.7.11,<2.8" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15,<2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<10" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6,<8" },

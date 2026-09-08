@@ -25,11 +25,24 @@ export type MeshtasticChannel = {
   recommended: boolean
 }
 
+export type MeshtasticConnectionType = 'usb' | 'serial' | 'network'
+
+export type MeshtasticDevice = {
+  path: string
+  label: string
+  connection_type: 'usb' | 'serial'
+}
+
 export type MeshtasticSettings = {
   connected: boolean
   node_id: number | null
   connection_type: string | null
   channels: MeshtasticChannel[]
+  devices: MeshtasticDevice[]
+  connection: {
+    connection_type: MeshtasticConnectionType
+    endpoint: string
+  } | null
   selection: {
     node_id: number
     channel_index: number
@@ -37,6 +50,10 @@ export type MeshtasticSettings = {
   } | null
   selection_valid: boolean
   recommended_channel_index: number | null
+  node_name: string | null
+  firmware_version: string | null
+  last_contact: string | null
+  mesh_status: 'not_evaluated'
   error: string | null
 }
 
@@ -81,6 +98,20 @@ export function getMeshtasticSettings(): Promise<MeshtasticSettings> {
 
 export function refreshMeshtasticChannels(): Promise<MeshtasticSettings> {
   return request('/api/settings/meshtastic/refresh', { method: 'POST' })
+}
+
+export function refreshMeshtasticDevices(): Promise<MeshtasticSettings> {
+  return request('/api/settings/meshtastic/devices/refresh', { method: 'POST' })
+}
+
+export function testMeshtasticConnection(
+  connectionType: MeshtasticConnectionType,
+  endpoint: string,
+): Promise<MeshtasticSettings> {
+  return request('/api/settings/meshtastic/test', {
+    method: 'POST',
+    body: JSON.stringify({ connection_type: connectionType, endpoint }),
+  })
 }
 
 export function selectMeshtasticChannel(

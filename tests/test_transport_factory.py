@@ -68,6 +68,35 @@ def test_factory_delegates_serial_settings(monkeypatch: pytest.MonkeyPatch) -> N
     assert calls == [("/dev/test", 4, "solora-link", 5)]
 
 
+def test_factory_delegates_network_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, int, str | None]] = []
+    marker = cast(InMemoryTransport, create_transport(TransportSettings(), node_id=1))
+
+    def open_network(
+        hostname: str,
+        *,
+        channel_index: int,
+        channel_name: str | None,
+        hop_limit: int | None,
+    ) -> InMemoryTransport:
+        del hop_limit
+        calls.append((hostname, channel_index, channel_name))
+        return marker
+
+    monkeypatch.setattr(factory.MeshtasticTransport, "open_network", open_network)
+    result = create_transport(
+        TransportSettings(
+            kind=TransportKind.MESHTASTIC_NETWORK,
+            network_host="mesh.local",
+            channel_index=3,
+            channel_name="solora-link",
+        )
+    )
+
+    assert result is marker
+    assert calls == [("mesh.local", 3, "solora-link")]
+
+
 def test_cli_selects_in_memory(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--transport", "in-memory", "--node-id", "0xa"]) == 0
     assert "Transport ready: in-memory, node=0x0000000a" in capsys.readouterr().out

@@ -1,6 +1,7 @@
 """HTTP routes for the local forum."""
 
 from collections.abc import Iterator
+from datetime import UTC
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -14,16 +15,19 @@ from solora.application.meshtastic_settings import (
     MeshtasticSettingsController,
     MeshtasticSettingsStatus,
 )
-from solora.domain.meshtastic_settings import RECOMMENDED_CHANNEL_NAME
+from solora.domain.meshtastic_settings import RECOMMENDED_CHANNEL_NAME, MeshtasticConnectionConfig
 from solora.domain.models import Post, Thread
 from solora.web.schemas import (
     CreatePostRequest,
     CreateThreadRequest,
     MeshtasticChannelResponse,
     MeshtasticChannelSelectionResponse,
+    MeshtasticConnectionResponse,
+    MeshtasticDeviceResponse,
     MeshtasticSettingsResponse,
     PostResponse,
     SelectMeshtasticChannelRequest,
+    TestMeshtasticConnectionRequest,
     ThreadResponse,
     ThreadSummaryResponse,
 )
@@ -62,6 +66,9 @@ SettingsControllerDependency = Annotated[
 
 def _settings(status_value: MeshtasticSettingsStatus) -> MeshtasticSettingsResponse:
     selection = status_value.selection
+    last_contact = status_value.last_contact
+    if last_contact is not None and last_contact.tzinfo is None:
+        last_contact = last_contact.replace(tzinfo=UTC)
     return MeshtasticSettingsResponse(
         connected=status_value.connected,
         node_id=status_value.node_id,
@@ -76,6 +83,22 @@ def _settings(status_value: MeshtasticSettingsStatus) -> MeshtasticSettingsRespo
             )
             for channel in status_value.channels
         ],
+        devices=[
+            MeshtasticDeviceResponse(
+                path=device.path,
+                label=device.label,
+                connection_type=device.connection_type,
+            )
+            for device in status_value.devices
+        ],
+        connection=(
+            MeshtasticConnectionResponse(
+                connection_type=status_value.connection.connection_type,
+                endpoint=status_value.connection.endpoint,
+            )
+            if status_value.connection is not None
+            else None
+        ),
         selection=(
             MeshtasticChannelSelectionResponse(
                 node_id=selection.node_id,
@@ -87,6 +110,9 @@ def _settings(status_value: MeshtasticSettingsStatus) -> MeshtasticSettingsRespo
         ),
         selection_valid=status_value.selection_valid,
         recommended_channel_index=status_value.recommended_channel_index,
+        node_name=status_value.node_name,
+        firmware_version=status_value.firmware_version,
+        last_contact=last_contact,
         error=status_value.error,
     )
 
@@ -105,8 +131,35 @@ def refresh_meshtastic_settings(
     repository: ChannelRepositoryDependency,
     controller: SettingsControllerDependency,
 ) -> MeshtasticSettingsResponse:
-    """Explicitly discover enabled channels from the serial node."""
+    """Explicitly reconnect to the saved USB, serial, or network node."""
     return _settings(controller.refresh(repository))
+
+
+@router.post("/settings/meshtastic/devices/refresh", response_model=MeshtasticSettingsResponse)
+def refresh_meshtastic_devices(
+    repository: ChannelRepositoryDependency,
+    controller: SettingsControllerDependency,
+) -> MeshtasticSettingsResponse:
+    """List serial endpoints without opening them or transmitting radio traffic."""
+    return _settings(controller.refresh_devices(repository))
+
+
+@router.post("/settings/meshtastic/test", response_model=MeshtasticSettingsResponse)
+def test_meshtastic_connection(
+    request: TestMeshtasticConnectionRequest,
+    repository: ChannelRepositoryDependency,
+    controller: SettingsControllerDependency,
+) -> MeshtasticSettingsResponse:
+    """Explicitly connect to one endpoint and read its public node information."""
+    return _settings(
+        controller.test_connection(
+            repository,
+            MeshtasticConnectionConfig(
+                connection_type=request.connection_type,
+                endpoint=request.endpoint.strip(),
+            ),
+        )
+    )
 
 
 @router.put("/settings/meshtastic/channel", response_model=MeshtasticSettingsResponse)

@@ -8,6 +8,7 @@ from sqlalchemy import engine_from_config, pool
 
 from solora.adapters.persistence.database import Base
 from solora.adapters.persistence.records import (  # noqa: F401
+    MeshtasticConnectionRecord,
     MeshtasticSettingsRecord,
     PostRecord,
     ThreadRecord,

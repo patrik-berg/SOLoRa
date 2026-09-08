@@ -10,6 +10,23 @@ const thread = {
   post_count: 1,
 }
 
+const baseStatus = {
+  connected: false,
+  node_id: null,
+  connection_type: null,
+  channels: [],
+  devices: [],
+  connection: null,
+  selection: null,
+  selection_valid: false,
+  recommended_channel_index: null,
+  node_name: null,
+  firmware_version: null,
+  last_contact: null,
+  mesh_status: 'not_evaluated',
+  error: null,
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -17,7 +34,11 @@ afterEach(() => {
 test('lists and opens a local thread', async () => {
   const fetchMock = vi.fn(async (input: string | URL | Request) => {
     const path = String(input)
-    const body = path === '/api/threads' ? [thread] : { ...thread, posts: [] }
+    const body = path === '/api/threads'
+      ? [thread]
+      : path === '/api/settings/meshtastic'
+        ? baseStatus
+        : { ...thread, posts: [] }
     return new Response(JSON.stringify(body), {
       headers: { 'Content-Type': 'application/json' },
     })
@@ -40,15 +61,10 @@ test('lists and opens a local thread', async () => {
 
 test('shows loading and empty states', async () => {
   let resolveThreads: ((response: Response) => void) | undefined
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(
-      () =>
-        new Promise<Response>((resolve) => {
-          resolveThreads = resolve
-        }),
-    ),
-  )
+  vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+    if (String(input) === '/api/settings/meshtastic') return Promise.resolve(Response.json(baseStatus))
+    return new Promise<Response>((resolve) => { resolveThreads = resolve })
+  }))
 
   render(<App />)
 
@@ -88,6 +104,7 @@ test('creates a thread and a post', async () => {
           : [],
       })
     }
+    if (path === '/api/settings/meshtastic') return Response.json(baseStatus)
     return Response.json(requests.some((request) => request.method === 'POST') ? [] : [])
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -118,27 +135,27 @@ test('shows an error when the API is unavailable', async () => {
 
 test('refreshes and confirms a Meshtastic channel only from settings', async () => {
   const requests: Array<{ path: string; method: string }> = []
-  const baseStatus = {
-    connected: false,
-    node_id: null,
-    connection_type: null,
-    channels: [],
-    selection: null,
-    selection_valid: false,
-    recommended_channel_index: null,
-    error: null,
-  }
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
     const method = init?.method ?? 'GET'
     requests.push({ path, method })
     if (path === '/api/threads') return Response.json([])
-    if (path.endsWith('/refresh')) {
+    if (path.endsWith('/devices/refresh')) {
+      return Response.json({
+        ...baseStatus,
+        devices: [{ path: 'COM7', label: 'Meshtastic USB', connection_type: 'usb' }],
+      })
+    }
+    if (path.endsWith('/test')) {
       return Response.json({
         ...baseStatus,
         connected: true,
         node_id: 161,
         connection_type: 'serial',
+        connection: { connection_type: 'usb', endpoint: 'COM7' },
+        node_name: 'SOL7',
+        firmware_version: '2.7.22',
+        last_contact: '2026-09-08T12:00:00',
         channels: [{ index: 3, name: 'solora-link', display_name: 'solora-link', role: 'secondary', recommended: true }],
         recommended_channel_index: 3,
         error: 'Choose and confirm a SOLoRa channel',
@@ -150,6 +167,8 @@ test('refreshes and confirms a Meshtastic channel only from settings', async () 
         connected: true,
         node_id: 161,
         connection_type: 'serial',
+        connection: { connection_type: 'usb', endpoint: 'COM7' },
+        node_name: 'SOL7',
         selection: { node_id: 161, channel_index: 3, channel_name: 'solora-link' },
         selection_valid: true,
       })
@@ -159,16 +178,58 @@ test('refreshes and confirms a Meshtastic channel only from settings', async () 
 
   render(<App />)
   await screen.findByText('Inga trådar ännu. Skapa den första.')
-  expect(requests).toEqual([{ path: '/api/threads', method: 'GET' }])
+  expect(requests).toContainEqual({ path: '/api/threads', method: 'GET' })
+  expect(requests).toContainEqual({ path: '/api/settings/meshtastic', method: 'GET' })
+  expect(requests).toHaveLength(2)
 
-  fireEvent.click(screen.getByRole('button', { name: 'Systeminställningar' }))
-  await screen.findByRole('heading', { name: 'Meshtastic-kanal' })
-  fireEvent.click(screen.getByRole('button', { name: 'Uppdatera kanaler från noden' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Offline' }))
+  await screen.findByRole('heading', { name: 'Meshtastic' })
+  fireEvent.click(screen.getByRole('button', { name: 'Uppdatera enhetslista' }))
+  const device = await screen.findByLabelText('Upptäckt enhet')
+  fireEvent.change(device, { target: { value: 'COM7' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Testa och spara anslutning' }))
   const select = await screen.findByLabelText('SOLoRa-kanal på denna nod')
   expect(select).toHaveValue('3:solora-link')
+  expect(screen.getByText('● Online')).toBeInTheDocument()
+  expect(screen.getByText('SOL7')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Bekräfta kanal' }))
 
-  await waitFor(() => expect(screen.getByText('Bekräftat')).toBeInTheDocument())
-  expect(requests).toContainEqual({ path: '/api/settings/meshtastic/refresh', method: 'POST' })
+  await waitFor(() => expect(requests).toContainEqual({ path: '/api/settings/meshtastic/channel', method: 'PUT' }))
+  expect(requests).toContainEqual({ path: '/api/settings/meshtastic/devices/refresh', method: 'POST' })
+  expect(requests).toContainEqual({ path: '/api/settings/meshtastic/test', method: 'POST' })
   expect(requests).toContainEqual({ path: '/api/settings/meshtastic/channel', method: 'PUT' })
+})
+
+test('accepts a network hostname without terminal configuration', async () => {
+  let submittedBody = ''
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = String(input)
+    if (path === '/api/threads') return Response.json([])
+    if (path.endsWith('/test')) {
+      submittedBody = String(init?.body)
+      return Response.json({
+        ...baseStatus,
+        connected: true,
+        node_id: 178,
+        node_name: 'SOL8',
+        connection_type: 'network',
+        connection: { connection_type: 'network', endpoint: 'mesh.local' },
+      })
+    }
+    return Response.json(baseStatus)
+  }))
+
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Offline' }))
+  fireEvent.click(screen.getByLabelText('Network'))
+  fireEvent.change(screen.getByLabelText('Hostname eller IP-adress'), {
+    target: { value: 'mesh.local' },
+  })
+  fireEvent.click(await screen.findByRole('button', { name: 'Testa och spara anslutning' }))
+
+  expect(await screen.findByText('SOL8')).toBeInTheDocument()
+  expect(JSON.parse(submittedBody)).toEqual({
+    connection_type: 'network',
+    endpoint: 'mesh.local',
+  })
 })

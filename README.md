@@ -46,19 +46,25 @@ The default is hardware-free:
 SOLORA_TRANSPORT=in-memory make transport-info
 ```
 
-Install the optional official Meshtastic SDK before opening a USB radio:
+The normal app includes the official Meshtastic SDK. Start SOLoRa, open **Systeminställningar → Meshtastic**, and complete the guided flow:
+
+1. Choose **USB**, **Serial**, or **Network**.
+2. Refresh and select a serial device (including Windows `COM` ports), or enter a network hostname/IP.
+3. Test and save the connection.
+4. Confirm the channel; `solora-link` is recommended when present.
+
+No environment variables or manual config editing are required. The fields below remain available only for developer diagnostics:
 
 ```sh
-make setup-radio
 SOLORA_MESHTASTIC_DEVICE=/dev/cu.usbmodem0001 \
 SOLORA_MESHTASTIC_CHANNEL=3 \
 SOLORA_MESHTASTIC_CHANNEL_NAME=solora-link \
 make transport-radio
 ```
 
-Open **Systeminställningar → Meshtastic-kanal** in the web UI, connect a serial node, and click **Uppdatera kanaler från noden**. Select an enabled channel and confirm it. `solora-link` is recommended when present, but never created or selected automatically. The saved binding includes node ID, channel name, and that node's local channel index; a change requires explicit reconfirmation. SOLoRa does not read, expose, or persist the channel PSK.
+The saved configuration includes connection type, endpoint, last known public node metadata, node ID, channel name, and that node's local channel index. A missing node or changed channel requires explicit reconfirmation. SOLoRa does not read, expose, or persist the channel PSK.
 
-Programmatic construction uses `TransportSettings.from_environment()` and `create_transport()`. Supported values for `SOLORA_TRANSPORT` are `in-memory` and `meshtastic-serial`; serial settings also accept `SOLORA_MESHTASTIC_DEVICE`, `SOLORA_MESHTASTIC_CHANNEL`, `SOLORA_MESHTASTIC_CHANNEL_NAME`, and `SOLORA_MESHTASTIC_HOP_LIMIT`. The CLI only verifies transport construction; it does not start forum synchronization.
+Programmatic construction uses `TransportSettings.from_environment()` and `create_transport()`. Supported values for `SOLORA_TRANSPORT` are `in-memory`, `meshtastic-serial`, and `meshtastic-network`. The CLI only verifies transport construction; it does not start forum synchronization.
 
 See [the two-radio hardware procedure](docs/MESHTASTIC_HARDWARE_TEST.md) before connecting physical nodes.
 

@@ -86,3 +86,17 @@ class MeshtasticSettingsRecord(Base):
     selected_node_id: Mapped[int] = mapped_column(Integer)
     selected_channel_index: Mapped[int] = mapped_column(Integer)
     selected_channel_name: Mapped[str] = mapped_column(String(12))
+
+
+class MeshtasticConnectionRecord(Base):
+    """Singleton containing the connection choice and last known node metadata."""
+
+    __tablename__ = "meshtastic_connection"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    connection_type: Mapped[str] = mapped_column(String(16))
+    endpoint: Mapped[str] = mapped_column(String(255))
+    node_id: Mapped[int | None] = mapped_column(Integer)
+    node_name: Mapped[str | None] = mapped_column(String(64))
+    firmware_version: Mapped[str | None] = mapped_column(String(64))
+    last_contact: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
