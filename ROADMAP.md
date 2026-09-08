@@ -43,10 +43,16 @@
 
 ## Phase 3 — Beta delivery
 
-- Produce cross-platform build artifacts.
-- Automate versioning as `v0.x.x-beta.N`.
-- Publish prereleases through GitHub Actions.
-- Add signed update metadata and an opt-in **Install beta** flow.
+- [x] Document the [desktop control window and headless delivery design](docs/PHASE3_DESKTOP_DELIVERY.md).
+- [ ] Validate a thin control-window toolkit and platform packaging prototype (provisionally Python/Tkinter + PyInstaller).
+- [ ] Implement desktop status, usable URLs, interface/port Apply, Open, Hide/restore, Quit, and Start/Restart.
+- [ ] Persist Start minimized and opt-in Run at login, with platform-specific startup adapters.
+- [ ] Provide independent supervisor controls so HTTP bind failures can be repaired from the window.
+- [ ] Provide GUI-free headless/service mode, including Raspberry Pi status and configuration controls.
+- [ ] Produce and smoke-test platform/architecture-specific installable artifacts, preserving user data outside binaries.
+- [ ] Automate versioning as `v0.x.x-beta.N`.
+- [ ] Publish prereleases through GitHub Actions.
+- [ ] Add signed update metadata and an opt-in **Install beta** flow.
 
 ## Stable releases
 

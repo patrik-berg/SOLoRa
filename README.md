@@ -4,6 +4,8 @@ SOLoRa is a local-first communication application. **Phase 1** provides a small 
 
 Current application version: `0.1.0` (local MVP; not a published stable release).
 
+Phase 3 will add an installed desktop control window for service status, web addresses, interface/port changes, opening the browser, Hide/Quit, and startup preferences. The forum and advanced settings stay in the web app. A separate headless mode will support servers and Raspberry Pi without a desktop. This is planned, not yet available; see the [desktop and headless delivery design](docs/PHASE3_DESKTOP_DELIVERY.md).
+
 ## Chosen stack
 
 - Python 3.12 and FastAPI for the local HTTP service

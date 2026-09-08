@@ -82,4 +82,12 @@ Meshtastic channel indices are node-local: two nodes may both use `solora-link` 
 
 ## Release policy
 
+### Desktop and headless installation
+
+Phase 3 must include a small local control window as part of the installed desktop app, alongside the existing browser-based forum. A thin shell over a local supervisor displays service readiness, web addresses, interface/port, app version, system name/role, and cached Meshtastic status. It supports Open SOLoRa, Hide/restore, Quit, Start/Restart, applying bind/port changes, Start minimized, and opt-in Run at login. Advanced configuration remains in the web app.
+
+The supervisor owns the desktop backend child and remains usable when HTTP fails. Local process control must be independent of the configurable HTTP listener. Headless mode instead uses an OS service manager and equivalent status/configuration controls, with no GUI dependency. One owner per data profile prevents duplicate services and radio connections. Name, role, and Node ID retain their independent meanings.
+
+The provisional packaging direction is a Python/Tkinter control shell with platform-specific bundles; toolkit selection must pass desktop accessibility, Hide/restore, startup, and Pi build gates. Loopback remains the default, wildcard bindings display actual usable addresses, and port/interface changes require explicit Apply with restart/recovery handling. See [Phase 3 desktop delivery design](docs/PHASE3_DESKTOP_DELIVERY.md) for requirements, alternatives, and validation gates. This is planned behavior, not a claim about the current launcher.
+
 GitHub Actions will eventually build immutable `v0.x.x-beta.N` artifacts. Stable promotion always requires explicit manual approval.
