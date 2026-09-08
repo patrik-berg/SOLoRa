@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "solora"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Local-first SOLoRa service scaffold"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -12,6 +12,9 @@ dependencies = [
   "alembic>=1.15,<2",
   "fastapi>=0.115,<1",
   "meshtastic>=2.7.11,<2.8",
+  "platformdirs>=4.3,<5",
+  "filelock>=3.18,<4",
+  "psutil>=7,<8",
   "sqlalchemy>=2.0,<3",
   "uvicorn[standard]>=0.34,<1",
 ]
@@ -23,8 +26,16 @@ dev = [
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "ruff>=0.11,<1",
+  "types-psutil>=7,<8",
 ]
 radio = []
+
+[project.scripts]
+solora = "solora.runtime.cli:main"
+
+[tool.hatch.version]
+path = "backend/src/solora/version.py"
+pattern = 'APP_VERSION = "(?P<version>[^\"]+)"'
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend/src/solora"]
@@ -35,6 +46,10 @@ testpaths = ["tests"]
 filterwarnings = [
   "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning:starlette.testclient",
 ]
+
+[tool.coverage.run]
+patch = ["subprocess"]
+source = ["solora"]
 
 [tool.ruff]
 target-version = "py312"

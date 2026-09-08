@@ -1,10 +1,14 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 
+import ApplicationStatusBar from './ApplicationStatusBar.tsx'
+import { useApplicationStatus } from './applicationStatus.ts'
+
 import {
   createPost,
   createThread,
   getMeshtasticSettings,
   getSystemSettings,
+  getRuntimeSettings,
   getThread,
   listThreads,
   refreshMeshtasticChannels,
@@ -16,6 +20,7 @@ import {
   type MeshtasticSettings,
   type SystemRole,
   type SystemSettings,
+  type RuntimeSettings,
   type Thread,
   type ThreadSummary,
 } from './api.ts'
@@ -41,6 +46,8 @@ function roleLabel(value: SystemRole | null | undefined) {
 }
 
 export default function App() {
+  const applicationStatus = useApplicationStatus()
+  const applicationOffline = applicationStatus.state === 'offline'
   const [threads, setThreads] = useState<ThreadSummary[]>([])
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
   const [newTitle, setNewTitle] = useState('')
@@ -50,6 +57,7 @@ export default function App() {
   const [view, setView] = useState<'forum' | 'settings'>('forum')
   const [settingsSection, setSettingsSection] = useState<'system' | 'meshtastic'>('system')
   const [system, setSystem] = useState<SystemSettings | null>(null)
+  const [runtime, setRuntime] = useState<RuntimeSettings | null>(null)
   const [systemName, setSystemName] = useState('')
   const [systemRole, setSystemRole] = useState<SystemRole>('CLIENT')
   const [confirmRoleChange, setConfirmRoleChange] = useState(false)
@@ -60,6 +68,28 @@ export default function App() {
   const [connectionType, setConnectionType] = useState<MeshtasticConnectionType>('usb')
   const [connectionEndpoint, setConnectionEndpoint] = useState('')
   const threadButtons = useRef(new Map<number, HTMLButtonElement>())
+  const latestThreadId = useRef<number | null>(null)
+
+  useEffect(() => { latestThreadId.current = selectedThread?.id ?? null }, [selectedThread])
+  useEffect(() => {
+    if (applicationStatus.recoveredAt === null) return
+    // Re-read view data after recovery; never replay writes or erase unsent form drafts.
+    let disposed = false
+    void listThreads().then(items => {
+      if (!disposed) { setThreads(items); setError('') }
+    }).catch(() => undefined)
+    void getMeshtasticSettings().then(value => {
+      if (!disposed) setRadio(value)
+    }).catch(() => undefined)
+    void getSystemSettings().then(value => {
+      if (!disposed) setSystem(value)
+    }).catch(() => undefined)
+    const threadId = latestThreadId.current
+    if (threadId !== null) void getThread(threadId).then(thread => {
+      if (!disposed && latestThreadId.current === threadId) setSelectedThread(thread)
+    }).catch(() => undefined)
+    return () => { disposed = true }
+  }, [applicationStatus.recoveredAt])
 
   async function refreshThreads() {
     setThreads(await listThreads())
@@ -136,6 +166,7 @@ export default function App() {
   }
 
   async function openSettings(section: 'system' | 'meshtastic' = 'meshtastic') {
+    void getRuntimeSettings().then(setRuntime).catch(() => setRuntime(null))
     setSettingsSection(section)
     setView('settings')
     setError('')
@@ -247,20 +278,19 @@ export default function App() {
             {system?.system_name ?? 'SOLoRa Node'} · {roleLabel(system?.system_role)}
           </button>
           <button
-            className={radio?.connected ? 'connection-pill online' : 'connection-pill offline'}
+            className="connection-pill"
             onClick={() => void openSettings('meshtastic')}
             type="button"
           >
-            <span aria-hidden="true">●</span>{' '}
-            {radio?.connected
-              ? `Meshtastic online via ${connectionLabel(radio.connection?.connection_type)}`
-              : 'Meshtastic offline'}
+            Meshtastic-inställningar
           </button>
           <span className="local-badge">Sparas lokalt</span>
         </div>
       </header>
 
-      {error && <p className="error" role="alert">{error}</p>}
+      <ApplicationStatusBar status={applicationStatus} />
+
+      {error && !applicationOffline && <p className="error" role="alert">{error}</p>}
 
       {view === 'settings' ? (
         <main className="settings-main">
@@ -350,9 +380,12 @@ export default function App() {
                     <div><dt>System role</dt><dd>{roleLabel(system?.system_role)}</dd></div>
                     <div><dt>Role status</dt><dd>{system?.role_status ?? 'active'}</dd></div>
                     <div><dt>Meshtastic Node ID</dt><dd>{radio?.node_id ? `!${radio.node_id.toString(16).padStart(8, '0')}` : '–'}</dd></div>
-                    <div><dt>Connection</dt><dd>{radio?.connected ? connectionLabel(radio.connection?.connection_type) : 'Offline'}</dd></div>
+                    <div><dt>Connection</dt><dd>{applicationOffline ? 'Unknown' : radio?.connected ? connectionLabel(radio.connection?.connection_type) : 'Offline'}</dd></div>
                     <div><dt>Channel</dt><dd>{radio?.selection?.channel_name ?? '–'}</dd></div>
                     <div><dt>App version</dt><dd>{system?.app_version ?? '–'}</dd></div>
+                    <div><dt>Runtime</dt><dd>{runtime?.mode ?? '–'}</dd></div>
+                    {runtime?.active && <div><dt>Aktiv webbserver</dt><dd>{runtime.active.bind}:{runtime.active.port}</dd></div>}
+                    {runtime?.configured && <div><dt>Sparad webbserver</dt><dd>{runtime.configured.bind}:{runtime.configured.port}</dd></div>}
                     <div><dt>Protocol version</dt><dd>{system?.protocol_version ?? '–'}</dd></div>
                     <div><dt>Primary authority</dt><dd>{system?.primary_authority_node_id ? `!${system.primary_authority_node_id.toString(16).padStart(8, '0')}` : '–'}</dd></div>
                   </dl>
@@ -435,7 +468,7 @@ export default function App() {
             </button>
 
             <dl className="radio-status">
-              <div><dt>Lokal anslutning</dt><dd>{radio?.connected ? '● Online' : '● Offline'}</dd></div>
+              <div><dt>Lokal anslutning</dt><dd>{applicationOffline ? '● Unknown' : radio?.connected ? '● Online' : '● Offline'}</dd></div>
               <div><dt>Typ</dt><dd>{connectionLabel(radio?.connection?.connection_type)}</dd></div>
               <div><dt>Nod</dt><dd>{radio?.node_name ?? '–'}</dd></div>
               <div><dt>Nod-ID</dt><dd>{radio?.node_id ? `0x${radio.node_id.toString(16).toUpperCase()}` : '–'}</dd></div>
@@ -444,7 +477,8 @@ export default function App() {
               <div><dt>Mesh/radio</dt><dd>Ej utvärderad</dd></div>
             </dl>
 
-            {radio?.error && <p className="settings-warning" role="status">{radio.error}</p>}
+            {applicationOffline && <p>Noduppgifterna är senast kända. Aktuell radioanslutning är okänd när SOLoRa är offline.</p>}
+            {radio?.error && !applicationOffline && <p className="settings-warning" role="status">{radio.error}</p>}
 
             {radio?.connection && (
               <button

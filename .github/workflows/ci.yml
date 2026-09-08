@@ -36,3 +36,19 @@ jobs:
 
       - name: Run verification suite
         run: make check
+
+  runtime-platform-checks:
+    name: Runtime (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev --locked
+      # Real child processes and tiny production asset fixtures; no Node, display, or radio.
+      - run: uv run pytest tests/test_runtime.py tests/test_desktop.py --no-cov

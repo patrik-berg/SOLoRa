@@ -33,12 +33,32 @@ const baseSystem = {
   role_status: 'active',
   meshtastic_node_id: null,
   primary_authority_node_id: null,
-  app_version: '0.1.0',
+  app_version: '0.2.0-beta.1',
   protocol_version: 1,
 }
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+test('shows active and saved runtime config without exposing process controls', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+    const path = String(input)
+    if (path === '/api/threads') return Response.json([])
+    if (path === '/api/settings/meshtastic') return Response.json(baseStatus)
+    if (path === '/api/settings/runtime') return Response.json({
+      mode: 'desktop',
+      active: { bind: '127.0.0.1', port: 8011 },
+      configured: { bind: '127.0.0.1', port: 8012 },
+    })
+    return Response.json(baseSystem)
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'SOL2 · Client' }))
+  expect(await screen.findByText('127.0.0.1:8011')).toBeInTheDocument()
+  expect(screen.getByText('127.0.0.1:8012')).toBeInTheDocument()
+  expect(screen.getByText('desktop')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Restart server/ })).not.toBeInTheDocument()
 })
 
 test('lists and opens a local thread', async () => {
@@ -197,9 +217,10 @@ test('refreshes and confirms a Meshtastic channel only from settings', async () 
   expect(requests).toContainEqual({ path: '/api/threads', method: 'GET' })
   expect(requests).toContainEqual({ path: '/api/settings/meshtastic', method: 'GET' })
   expect(requests).toContainEqual({ path: '/api/settings/system', method: 'GET' })
-  expect(requests).toHaveLength(3)
+  expect(requests).toHaveLength(4)
+  expect(requests).toContainEqual({ path: '/api/status', method: 'GET' })
 
-  fireEvent.click(screen.getByRole('button', { name: 'Meshtastic offline' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Meshtastic-inställningar' }))
   await screen.findByRole('heading', { name: 'Meshtastic' })
   fireEvent.click(screen.getByRole('button', { name: 'Uppdatera enhetslista' }))
   const device = await screen.findByLabelText('Upptäckt enhet')
@@ -238,7 +259,7 @@ test('accepts a network hostname without terminal configuration', async () => {
   }))
 
   render(<App />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Meshtastic offline' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Meshtastic-inställningar' }))
   fireEvent.click(screen.getByLabelText('Network'))
   fireEvent.change(screen.getByLabelText('Hostname eller IP-adress'), {
     target: { value: 'mesh.local' },
@@ -285,7 +306,7 @@ test('keeps system name and role separate and confirms role changes', async () =
   render(<App />)
 
   fireEvent.click(await screen.findByRole('button', { name: 'SOL2 · Client' }))
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7))
   fireEvent.change(screen.getByLabelText('System name'), {
     target: { value: 'Base North' },
   })

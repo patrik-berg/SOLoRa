@@ -2,9 +2,9 @@
 
 SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. **Phase 2** adds binary two-node transport, durable retry, deduplication, explicit hardware-independent forum repair, and an initial USB/serial Meshtastic adapter. Accounts, automatic synchronization scheduling, and automatic releases are not implemented yet.
 
-Current application version: `0.1.0` (local MVP; not a published stable release).
+Application version is defined in `backend/src/solora/version.py`; `uv run solora --version` reports it. It is independent of radio protocol version and is not a published stable release.
 
-Phase 3 will add an installed desktop control window for service status, web addresses, interface/port changes, opening the browser, Hide/Quit, and startup preferences. The forum and advanced settings stay in the web app. A separate headless mode will support servers and Raspberry Pi without a desktop. This is planned, not yet available; see the [desktop and headless delivery design](docs/PHASE3_DESKTOP_DELIVERY.md).
+Phase 3A PR A adds a source-run desktop control-window prototype and GUI-free production runtime. Use `make desktop` or `make runtime-server` after setup. The forum and advanced settings remain in the web app. **These commands use a separate persistent user profile, not the development `data/solora.db`.** Standalone installers and service packages are PR B work. See [runtime usage, paths, recovery and validation](docs/PHASE3A_RUNTIME.md).
 
 Planned distributions are **SOLoRa Desktop** for Windows/macOS, **SOLoRa Server** installed on existing Linux/Raspberry Pi OS (Pi 4/5, preferably `.deb`), and **SOLoRa Appliance** as a flashable headless SD image for Pi Zero 2 W. All share the same core. Hardware never selects `CLIENT`, `PRIMARY`, or `BACKUP`; roles remain explicit. Zero 2 W Primary/Backup performance and robustness are targets awaiting physical validation. The appliance will include automatic startup, browser setup, and `solora-config` recovery without a desktop.
 
@@ -69,6 +69,12 @@ make transport-radio
 The saved configuration includes connection type, endpoint, last known public node metadata, node ID, channel name, and that node's local channel index. A missing node or changed channel requires explicit reconfirmation. SOLoRa does not read, expose, or persist the channel PSK.
 
 ## Configure system identity
+
+The global status strip distinguishes browser/backend readiness from the local
+Meshtastic connection and future Primary authority. If the server stops, the
+loaded page detects the outage automatically, shows a dismissible dialog and
+recovers when the server returns; unsent drafts remain. Primary is Unknown until
+real heartbeat support exists. Status checks are local HTTP only, never radio traffic.
 
 Open **Systeminställningar → System** to set the local display name and explicit role. `Client` is active; `Primary server` and `Backup server` are stored for test environments but remain experimental until their runtime behavior is implemented. Changing role requires a visible confirmation. The same page shows browser-accessible diagnostics for system identity, Meshtastic connection, selected channel, and app/protocol versions.
 

@@ -59,6 +59,16 @@ export type MeshtasticSettings = {
 
 export type SystemRole = 'CLIENT' | 'PRIMARY' | 'BACKUP'
 
+export type RuntimeSettings = {
+  mode: 'development' | 'desktop' | 'server'
+  active: { bind: string; port: number } | null
+  configured: { bind: string; port: number } | null
+}
+
+export function getRuntimeSettings(): Promise<RuntimeSettings> {
+  return request('/api/settings/runtime')
+}
+
 export type SystemSettings = {
   system_name: string
   system_role: SystemRole

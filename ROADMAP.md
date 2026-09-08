@@ -43,6 +43,23 @@
 
 ## Phase 3 — Beta delivery
 
+### Phase 3A PR A — runtime foundation
+
+- [x] Serve built React assets through the production FastAPI factory without Node at runtime.
+- [x] Separate persistent paths from application files; share atomic bootstrap config before HTTP startup.
+- [x] Centralize application version independently from the unchanged radio protocol.
+- [x] Add `/health/ready` for database, migrations, state and production assets; radio is optional.
+- [x] Add browser application watchdog, one dialog per outage, automatic recovery and global Application/Node/Primary status; Primary heartbeat remains unimplemented/Unknown.
+- [x] Implement exclusive desktop/server ownership, private-pipe status/shutdown and failed-start recovery.
+- [x] Add ttk control-window proof-of-concept with Apply, Open, Restart, Stop, native minimize/restore, Quit and Start minimized.
+- [x] Exercise real child-process lifecycle and GUI-free startup automatically; real macOS Tk scripted smoke passes.
+- [ ] Complete interactive desktop accessibility/browser checks and native packaged toolkit validation.
+- [ ] **PR B:** standalone artifacts, OS login/icon integration, Linux/Pi service packages, build CI and release metadata.
+
+PR A is not an installer or completed Phase 3. See [runtime evidence and remaining gates](docs/PHASE3A_RUNTIME.md).
+
+### Overall delivery gates
+
 - [x] Document the [desktop control window and headless delivery design](docs/PHASE3_DESKTOP_DELIVERY.md).
 - [x] Define Desktop (Windows/macOS), Server (Linux/Pi 4/5 on existing OS), and Appliance (Zero 2 W SD image) as distribution models independent of role.
 - [ ] Package Server for existing Raspberry Pi OS on Pi 4/5, preferably `.deb`, without requiring a dedicated image.
@@ -52,10 +69,10 @@
 - [ ] Validate persistent data separation, watchdog/restart, power-loss recovery, backup/restore, and safe application/database rollback; investigate read-only root only afterwards.
 - [ ] **Required Zero 2 W Primary/Backup gate:** physically measure idle RAM/CPU, startup, SQLite/web latency, sync bursts, reconnect/repair, auth, replication, temperature and sustained stability within the 512 MB target. Unimplemented auth/replication measurements remain pending.
 - [ ] Validate a thin control-window toolkit and platform packaging prototype (provisionally Python/Tkinter + PyInstaller).
-- [ ] Implement desktop status, usable URLs, interface/port Apply, Open, Hide/restore, Quit, and Start/Restart.
+- [x] Implement prototype desktop status, usable URLs, interface/port Apply, Open, Hide/restore, Quit, and Start/Restart.
 - [ ] Persist Start minimized and opt-in Run at login, with platform-specific startup adapters.
-- [ ] Provide independent supervisor controls so HTTP bind failures can be repaired from the window.
-- [ ] Provide GUI-free headless/service mode, including Raspberry Pi status and configuration controls.
+- [x] Provide independent supervisor controls so HTTP bind failures can be repaired from the window.
+- [x] Provide GUI-free headless runtime and offline bootstrap status/configuration controls; Raspberry Pi packaging remains unverified.
 - [ ] Produce and smoke-test platform/architecture-specific installable artifacts, preserving user data outside binaries.
 - [ ] Automate versioning as `v0.x.x-beta.N`.
 - [ ] Publish prereleases through GitHub Actions.

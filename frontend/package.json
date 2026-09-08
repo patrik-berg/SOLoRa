@@ -1,7 +1,6 @@
 {
   "name": "solora-frontend",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@11.19.0",
   "engines": {
