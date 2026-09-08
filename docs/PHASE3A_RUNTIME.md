@@ -153,6 +153,11 @@ wait for the bounded two-failure threshold, verify the dialog and Node Unknown,
 then restart. The already-loaded page must recover without reloading. Also test
 dialog dismissal/Escape, focus restoration and narrow-screen wrapping.
 
+The Online → native offline dialog → Online sequence was observed in the same
+in-app browser tab using a separately controlled production server, including
+automatic dialog closure and the recovery message. Recovery also re-reads cached
+radio/system metadata without resetting editable settings or unsent text.
+
 The implementation uses `tkinter.ttk`, with lifecycle operations on a worker and
 widgets on the main Tk thread. Hide/close uses the documented native minimized
 window fallback (Dock/taskbar); reopening restores it. No custom tray framework

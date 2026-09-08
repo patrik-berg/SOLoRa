@@ -170,4 +170,20 @@ test('global offline replaces misleading settings error and recovery retains uns
   fireEvent.click(screen.getByRole('button', { name: 'Till forumet' }))
   expect(screen.getByLabelText('Ny tråd')).toHaveValue('Unsent draft')
   expect(screen.getByText('Application Online')).toBeInTheDocument()
+  expect(fetchMock.mock.calls.filter(([url]) => url === '/api/settings/meshtastic').length).toBeGreaterThan(2)
+})
+
+test('radio-specific errors are still shown when application readiness is online', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url === '/api/status') return Response.json(online)
+    if (url === '/api/threads') return Response.json([])
+    if (url === '/api/settings/meshtastic') throw new Error('radio settings unavailable')
+    return Response.json({ system_name: 'Base North', system_role: 'CLIENT' })
+  }))
+  render(<App />)
+  await advance()
+  fireEvent.click(screen.getByRole('button', { name: 'Meshtastic-inställningar' }))
+  await advance()
+  expect(screen.getByText('Application Online')).toBeInTheDocument()
+  expect(screen.getByText('Det gick inte att läsa radioinställningarna.')).toBeInTheDocument()
 })

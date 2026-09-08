@@ -78,6 +78,12 @@ export default function App() {
     void listThreads().then(items => {
       if (!disposed) { setThreads(items); setError('') }
     }).catch(() => undefined)
+    void getMeshtasticSettings().then(value => {
+      if (!disposed) setRadio(value)
+    }).catch(() => undefined)
+    void getSystemSettings().then(value => {
+      if (!disposed) setSystem(value)
+    }).catch(() => undefined)
     const threadId = latestThreadId.current
     if (threadId !== null) void getThread(threadId).then(thread => {
       if (!disposed && latestThreadId.current === threadId) setSelectedThread(thread)
