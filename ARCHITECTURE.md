@@ -96,6 +96,13 @@ and read-only in web diagnostics. Application version comes from `version.py`,
 not the protocol registry. See [the implemented runtime contract](docs/PHASE3A_RUNTIME.md)
 for layout, recovery, test evidence and remaining packaging/platform gates.
 
+The browser's global watchdog consumes `/api/status`, a read-only summary built
+from the same readiness checks and cached local radio state. It distinguishes
+Online/Degraded/Offline and never drives radio discovery or traffic. Node state is
+unknown without a current backend snapshot; Primary heartbeat fields remain null
+until actual authority/heartbeat behavior exists. A client-only relative timer
+can later age a real heartbeat timestamp without increased HTTP/radio traffic.
+
 ### Desktop and headless installation
 
 Distribution is separate from role: **Desktop** targets Windows/macOS; **Server** installs on existing Linux/Raspberry Pi OS on Pi 4/5, preferably via `.deb`; **Appliance** is a flashable, automatically starting headless image for Pi Zero 2 W. Linux desktop controls are optional; Zero 2 W has no desktop, Tkinter, or development tools. All use identical core, protocol, database, sync, roles, transport, and web UI; packaging and OS/recovery adapters provide the differences.

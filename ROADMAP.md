@@ -49,6 +49,7 @@
 - [x] Separate persistent paths from application files; share atomic bootstrap config before HTTP startup.
 - [x] Centralize application version independently from the unchanged radio protocol.
 - [x] Add `/health/ready` for database, migrations, state and production assets; radio is optional.
+- [x] Add browser application watchdog, one dialog per outage, automatic recovery and global Application/Node/Primary status; Primary heartbeat remains unimplemented/Unknown.
 - [x] Implement exclusive desktop/server ownership, private-pipe status/shutdown and failed-start recovery.
 - [x] Add ttk control-window proof-of-concept with Apply, Open, Restart, Stop, native minimize/restore, Quit and Start minimized.
 - [x] Exercise real child-process lifecycle and GUI-free startup automatically; real macOS Tk scripted smoke passes.

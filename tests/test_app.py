@@ -169,6 +169,55 @@ def test_built_frontend_is_served(tmp_path: Path) -> None:
     assert "SOLoRa frontend" in response.text
 
 
+def test_browser_status_is_cached_readiness_not_radio_or_authority(tmp_path: Path) -> None:
+    url = _database_url(tmp_path)
+    _migrate(url)
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    (frontend / "index.html").write_text('<script src="/main.js"></script>', encoding="utf-8")
+    (frontend / "main.js").write_text("/* built */", encoding="utf-8")
+    gateway = FakeMeshtasticGateway()
+    with TestClient(
+        create_app(database_url=url, frontend_path=frontend, meshtastic_gateway=gateway)
+    ) as client:
+        for _ in range(3):
+            response = client.get("/api/status")
+            assert response.status_code == 200
+            assert response.headers["cache-control"] == "no-store"
+            result = response.json()
+            assert result["application"]["state"] == "online"
+            assert result["meshtastic"]["connection_state"] == "offline"
+            assert result["primary"]["last_heartbeat_at"] is None
+        assert gateway.calls == gateway.device_calls == 0
+        client.post(
+            "/api/settings/meshtastic/test", json={"connection_type": "usb", "endpoint": "COM7"}
+        )
+        client.put(
+            "/api/settings/system",
+            json={"system_name": "SOL1", "system_role": "PRIMARY", "confirm_role_change": True},
+        )
+        for _ in range(3):
+            result = client.get("/api/status").json()
+            assert result["meshtastic"]["connection_state"] == "online"
+            assert result["meshtastic"]["node_id"] == gateway.node_id
+            assert result["primary"]["node_id"] is None
+            assert result["primary"]["last_heartbeat_at"] is None
+        assert gateway.calls == 1
+        assert gateway.device_calls == 0
+        gateway.connected = False
+        assert client.get("/api/status").json()["meshtastic"]["connection_state"] == "offline"
+        (frontend / "main.js").unlink()
+        assert client.get("/api/status").json()["application"]["state"] == "degraded"
+        assert client.get("/health/ready").status_code == 503
+
+
+def test_browser_status_broken_database_is_degraded_not_fake_offline(tmp_path: Path) -> None:
+    with TestClient(create_app(database_url=_database_url(tmp_path))) as client:
+        result = client.get("/api/status").json()
+        assert result["application"]["state"] == "degraded"
+        assert result["meshtastic"]["connection_state"] == "unknown"
+
+
 class FakeMeshtasticGateway:
     def __init__(self) -> None:
         self.calls = 0

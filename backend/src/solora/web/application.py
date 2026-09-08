@@ -19,6 +19,7 @@ from solora.runtime.health import readiness
 from solora.runtime.paths import RuntimePaths
 from solora.runtime.settings import ConfigStore, RuntimeConfig
 from solora.web.routes import router
+from solora.web.status import browser_status
 
 
 def create_app(
@@ -76,6 +77,14 @@ def create_app(
             "active": asdict(runtime_config) if runtime_config else None,
             "configured": asdict(ConfigStore(runtime_paths.config).load()),
         }
+
+    @application.get("/api/status", tags=["system"])
+    def status_summary() -> JSONResponse:
+        paths = runtime_paths or RuntimePaths.discover()
+        return JSONResponse(
+            browser_status(database, settings_controller, static_path, paths.migrations),
+            headers={"Cache-Control": "no-store"},
+        )
 
     if static_path.is_dir():
         application.mount("/", StaticFiles(directory=static_path, html=True), name="frontend")

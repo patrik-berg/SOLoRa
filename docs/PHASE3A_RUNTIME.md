@@ -117,6 +117,42 @@ longer carries a competing release version. Protocol version remains 1.
 
 ## Toolkit result and remaining gates
 
+### Browser application watchdog
+
+The browser polls read-only `GET /api/status` four seconds after each completed
+attempt, with a 2.5-second timeout and no overlapping requests. Two consecutive
+network failures/timeouts produce **Application Offline**; a single failure only
+invalidates the radio snapshot. A responding backend with failed readiness,
+unexpected HTTP status or an incompatible response is **Degraded**, not Offline.
+Online requires the same readiness function used by `/health/ready`; that endpoint's
+updater contract and HTTP 200/503 semantics are unchanged. Responses are not cached.
+Browser timer throttling can delay detection in background/suspended tabs.
+
+The global strip separates Application, local Meshtastic Node and Primary. When
+the backend cannot be reached, Node is Unknown, not inferred from an old node list.
+The summary reads only cached local connection state and persisted public metadata;
+it never discovers/connects/polls a radio or sends a LoRa packet. An optional radio
+being Offline does not make the application unhealthy.
+
+Each Offline transition opens one native modal dialog with last-online time.
+Dismissal leaves persistent status visible; later polling does not reopen the same
+outage. Backend recovery closes the dialog, and eventual readiness announces
+Online again, refreshes forum reads and preserves unsent drafts. Writes are never
+automatically retried. Known application-offline state suppresses misleading
+radio-specific error banners. Desktop controls remain usable independently.
+
+`primary` reserves nullable `node_id`, `system_name`, and `last_heartbeat_at` fields.
+All currently remain null: neither a configured experimental PRIMARY role nor the
+display name SOL1 proves runtime authority. The strip therefore shows **Primary ·
+Unknown**. A future genuine timestamp can be displayed with a one-second local
+relative-age timer, without one-second HTTP calls. The timer is presentation only,
+not failover/liveness policy; no Primary heartbeat transport is implemented here.
+
+Manual browser check: load the updated preview once, stop its desktop-owned server,
+wait for the bounded two-failure threshold, verify the dialog and Node Unknown,
+then restart. The already-loaded page must recover without reloading. Also test
+dialog dismissal/Escape, focus restoration and narrow-screen wrapping.
+
 The implementation uses `tkinter.ttk`, with lifecycle operations on a worker and
 widgets on the main Tk thread. Hide/close uses the documented native minimized
 window fallback (Dock/taskbar); reopening restores it. No custom tray framework

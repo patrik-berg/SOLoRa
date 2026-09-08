@@ -5,7 +5,7 @@ Review against the unchanged root `CHECKLIST.md`:
 | Item | Evidence / applicability |
 | --- | --- |
 | 1–3 Scope, architecture, relevant files | Runtime/desktop adapters, shared web factory/config diagnostics, docs/tests/CI only. Packaging and authority remain out of scope. |
-| 4–6 Tests and builds | 112 pytest tests, 8 frontend tests, 93.81% coverage; `make check` includes Ruff, Oxlint, mypy, TypeScript, Python wheel/sdist and Vite build. |
+| 4–6 Tests and builds | 114 pytest tests, 18 frontend tests, 93.93% coverage; `make check` includes Ruff, Oxlint, mypy, TypeScript, Python wheel/sdist and Vite build. |
 | 7 Documentation | README, ARCHITECTURE, ROADMAP, delivery design and `PHASE3A_RUNTIME.md` updated. |
 | 8 Compatibility | Existing developer command and `/health` retained; new readiness endpoint separate. |
 | 9 Data safety | No migration files rewritten. Existing migrations run under exclusive profile ownership; tests preserve existing forum data. Development database is not moved or replaced. |
@@ -21,3 +21,15 @@ Windows certification. Interactive screen/default-browser review was blocked by 
 locked Mac. Those checks, native packaged installation/login/icon behavior, Pi 4/5
 physical validation and the still-open Phase 2 radio gate are explicitly pending.
 No Phase 2/3 completion or installation-without-Python claim is made here.
+
+Browser-watchdog follow-up: scoped read-only status summary and frontend changes;
+no schema, wire IDs, radio retry/airtime/priority or release changes. Tests cover
+two-failure debounce, timeout/cancellation, degraded versus offline, one dialog per
+outage, recovery, draft retention, Node Unknown, honest Primary state and purely
+local heartbeat-age updates. Repeated status reads are verified not to invoke
+radio discovery or device polling. Full-suite counts and latest CI are recorded
+in PR #16 after verification.
+
+The watchdog's interactive stop/restart browser check is pending: process-inspection
+permission review timed out twice. Native dialog focus/Escape/narrow-screen behavior
+still needs browser validation; jsdom tests stub native dialog top-layer methods.

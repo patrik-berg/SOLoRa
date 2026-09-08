@@ -217,9 +217,10 @@ test('refreshes and confirms a Meshtastic channel only from settings', async () 
   expect(requests).toContainEqual({ path: '/api/threads', method: 'GET' })
   expect(requests).toContainEqual({ path: '/api/settings/meshtastic', method: 'GET' })
   expect(requests).toContainEqual({ path: '/api/settings/system', method: 'GET' })
-  expect(requests).toHaveLength(3)
+  expect(requests).toHaveLength(4)
+  expect(requests).toContainEqual({ path: '/api/status', method: 'GET' })
 
-  fireEvent.click(screen.getByRole('button', { name: 'Meshtastic offline' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Meshtastic-inställningar' }))
   await screen.findByRole('heading', { name: 'Meshtastic' })
   fireEvent.click(screen.getByRole('button', { name: 'Uppdatera enhetslista' }))
   const device = await screen.findByLabelText('Upptäckt enhet')
@@ -258,7 +259,7 @@ test('accepts a network hostname without terminal configuration', async () => {
   }))
 
   render(<App />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Meshtastic offline' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Meshtastic-inställningar' }))
   fireEvent.click(screen.getByLabelText('Network'))
   fireEvent.change(screen.getByLabelText('Hostname eller IP-adress'), {
     target: { value: 'mesh.local' },
@@ -305,7 +306,7 @@ test('keeps system name and role separate and confirms role changes', async () =
   render(<App />)
 
   fireEvent.click(await screen.findByRole('button', { name: 'SOL2 · Client' }))
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7))
   fireEvent.change(screen.getByLabelText('System name'), {
     target: { value: 'Base North' },
   })

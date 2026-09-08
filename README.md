@@ -70,6 +70,12 @@ The saved configuration includes connection type, endpoint, last known public no
 
 ## Configure system identity
 
+The global status strip distinguishes browser/backend readiness from the local
+Meshtastic connection and future Primary authority. If the server stops, the
+loaded page detects the outage automatically, shows a dismissible dialog and
+recovers when the server returns; unsent drafts remain. Primary is Unknown until
+real heartbeat support exists. Status checks are local HTTP only, never radio traffic.
+
 Open **Systeminställningar → System** to set the local display name and explicit role. `Client` is active; `Primary server` and `Backup server` are stored for test environments but remain experimental until their runtime behavior is implemented. Changing role requires a visible confirmation. The same page shows browser-accessible diagnostics for system identity, Meshtastic connection, selected channel, and app/protocol versions.
 
 System name, system role, and Meshtastic Node ID are deliberately separate. `SOL1` is only a common display name and has no special behavior. A Primary is defined by `system_role = PRIMARY` and identified to other nodes by its Meshtastic Node ID, not its name.
