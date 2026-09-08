@@ -8,7 +8,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 
 from solora.app import create_app
-from solora.domain.meshtastic_settings import MeshtasticChannel, MeshtasticNodeChannels
+from solora.domain.meshtastic_settings import (
+    MeshtasticChannel,
+    MeshtasticConnectionConfig,
+    MeshtasticConnectionType,
+    MeshtasticDevice,
+    MeshtasticNodeChannels,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -37,6 +43,7 @@ def test_migration_creates_forum_schema(tmp_path: Path) -> None:
         "received_messages",
         "repair_requests",
         "meshtastic_settings",
+        "meshtastic_connection",
     }
 
 
@@ -59,6 +66,31 @@ def test_transport_migration_preserves_existing_posts(tmp_path: Path) -> None:
         ).one()
     assert saved_post == ("Sparad text", 12)
     assert saved_thread == ("Befintlig tråd", 12)
+
+
+def test_connection_migration_preserves_existing_channel_selection(tmp_path: Path) -> None:
+    database_url = _database_url(tmp_path)
+    _migrate(database_url, "20260908_0004")
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO meshtastic_settings "
+                "(id, selected_node_id, selected_channel_index, selected_channel_name) "
+                "VALUES (1, 161, 3, 'solora-link')"
+            )
+        )
+
+    _migrate(database_url)
+
+    with engine.connect() as connection:
+        saved = connection.execute(
+            text(
+                "SELECT selected_node_id, selected_channel_index, selected_channel_name "
+                "FROM meshtastic_settings WHERE id = 1"
+            )
+        ).one()
+    assert saved == (161, 3, "solora-link")
 
 
 def test_forum_api_persists_threads_and_posts(tmp_path: Path) -> None:
@@ -136,18 +168,52 @@ def test_built_frontend_is_served(tmp_path: Path) -> None:
     assert "SOLoRa frontend" in response.text
 
 
-class FakeChannelDiscovery:
+class FakeMeshtasticGateway:
     def __init__(self) -> None:
         self.calls = 0
+        self.device_calls = 0
+        self.connected = False
+        self.configs: list[MeshtasticConnectionConfig] = []
+        self.error: Exception | None = None
         self.node_id = 0xA1
         self.channels: tuple[MeshtasticChannel, ...] = (
             MeshtasticChannel(0, "Primary", "primary"),
             MeshtasticChannel(3, "solora-link", "secondary"),
         )
 
-    def discover(self) -> MeshtasticNodeChannels:
+    def list_devices(self) -> tuple[MeshtasticDevice, ...]:
+        self.device_calls += 1
+        return (
+            MeshtasticDevice(
+                "COM7",
+                "Meshtastic USB",
+                MeshtasticConnectionType.USB,
+            ),
+            MeshtasticDevice(
+                "/dev/ttyS0",
+                "Serial port",
+                MeshtasticConnectionType.SERIAL,
+            ),
+        )
+
+    def discover(self, config: MeshtasticConnectionConfig) -> MeshtasticNodeChannels:
         self.calls += 1
-        return MeshtasticNodeChannels(self.node_id, "serial", self.channels)
+        self.configs.append(config)
+        if self.error is not None:
+            self.connected = False
+            raise self.error
+        self.connected = True
+        return MeshtasticNodeChannels(
+            self.node_id,
+            config.connection_type,
+            self.channels,
+            endpoint=config.endpoint,
+            node_name="SOL7",
+            firmware_version="2.7.22",
+        )
+
+    def close(self) -> None:
+        self.connected = False
 
 
 def test_meshtastic_channel_selection_is_explicit_persistent_and_silent(
@@ -155,15 +221,27 @@ def test_meshtastic_channel_selection_is_explicit_persistent_and_silent(
 ) -> None:
     database_url = _database_url(tmp_path)
     _migrate(database_url)
-    discovery = FakeChannelDiscovery()
+    discovery = FakeMeshtasticGateway()
 
-    with TestClient(create_app(database_url=database_url, channel_discovery=discovery)) as client:
+    with TestClient(create_app(database_url=database_url, meshtastic_gateway=discovery)) as client:
         initial = client.get("/api/settings/meshtastic").json()
         assert discovery.calls == 0
+        assert discovery.device_calls == 0
         assert initial["connected"] is False
 
-        refreshed = client.post("/api/settings/meshtastic/refresh").json()
+        devices = client.post("/api/settings/meshtastic/devices/refresh").json()
+        assert [device["path"] for device in devices["devices"]] == ["COM7", "/dev/ttyS0"]
+        assert discovery.calls == 0
+
+        refreshed = client.post(
+            "/api/settings/meshtastic/test",
+            json={"connection_type": "usb", "endpoint": "COM7"},
+        ).json()
         assert discovery.calls == 1
+        assert refreshed["connected"] is True
+        assert refreshed["node_name"] == "SOL7"
+        assert refreshed["firmware_version"] == "2.7.22"
+        assert refreshed["last_contact"] is not None
         assert refreshed["recommended_channel_index"] == 3
         assert "psk" not in str(refreshed).lower()
 
@@ -173,22 +251,28 @@ def test_meshtastic_channel_selection_is_explicit_persistent_and_silent(
         ).json()
         assert selected["selection_valid"] is True
 
-    restarted_discovery = FakeChannelDiscovery()
+    restarted_discovery = FakeMeshtasticGateway()
     with TestClient(
-        create_app(database_url=database_url, channel_discovery=restarted_discovery)
+        create_app(database_url=database_url, meshtastic_gateway=restarted_discovery)
     ) as client:
         saved = client.get("/api/settings/meshtastic").json()
         assert restarted_discovery.calls == 0
         assert saved["selection"]["channel_index"] == 3
+        assert saved["connection"] == {"connection_type": "usb", "endpoint": "COM7"}
+        assert saved["node_name"] == "SOL7"
+        assert saved["last_contact"] is not None
         assert saved["selection_valid"] is False
 
 
 def test_channel_move_or_node_change_requires_explicit_reconfirmation(tmp_path: Path) -> None:
     database_url = _database_url(tmp_path)
     _migrate(database_url)
-    discovery = FakeChannelDiscovery()
-    with TestClient(create_app(database_url=database_url, channel_discovery=discovery)) as client:
-        client.post("/api/settings/meshtastic/refresh")
+    discovery = FakeMeshtasticGateway()
+    with TestClient(create_app(database_url=database_url, meshtastic_gateway=discovery)) as client:
+        client.post(
+            "/api/settings/meshtastic/test",
+            json={"connection_type": "network", "endpoint": "meshtastic.local"},
+        )
         client.put(
             "/api/settings/meshtastic/channel",
             json={"channel_index": 3, "channel_name": "solora-link"},
@@ -216,3 +300,43 @@ def test_channel_move_or_node_change_requires_explicit_reconfirmation(tmp_path: 
         changed_node = client.post("/api/settings/meshtastic/refresh").json()
         assert changed_node["selection_valid"] is False
         assert "differs" in changed_node["error"]
+
+
+def test_connection_types_and_missing_node_have_clear_hardware_free_results(
+    tmp_path: Path,
+) -> None:
+    database_url = _database_url(tmp_path)
+    _migrate(database_url)
+    gateway = FakeMeshtasticGateway()
+
+    with TestClient(create_app(database_url=database_url, meshtastic_gateway=gateway)) as client:
+        for connection_type, endpoint in (
+            ("usb", "COM7"),
+            ("serial", "/dev/ttyS0"),
+            ("network", "meshtastic.local"),
+        ):
+            response = client.post(
+                "/api/settings/meshtastic/test",
+                json={"connection_type": connection_type, "endpoint": endpoint},
+            )
+            assert response.status_code == 200
+            assert response.json()["connection"] == {
+                "connection_type": connection_type,
+                "endpoint": endpoint,
+            }
+
+        gateway.error = OSError("configured node is unavailable")
+        unavailable = client.post(
+            "/api/settings/meshtastic/test",
+            json={"connection_type": "network", "endpoint": "missing.local"},
+        )
+        assert unavailable.status_code == 200
+        assert unavailable.json()["connected"] is False
+        assert "unavailable" in unavailable.json()["error"]
+        assert unavailable.json()["connection"]["endpoint"] == "missing.local"
+
+        blank = client.post(
+            "/api/settings/meshtastic/test",
+            json={"connection_type": "network", "endpoint": "   "},
+        )
+        assert blank.status_code == 422

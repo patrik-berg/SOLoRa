@@ -10,12 +10,18 @@ import pytest
 from solora.adapters.transport import meshtastic
 from solora.adapters.transport.meshtastic import (
     BROADCAST_NODE_ID,
+    CONNECTION_LOST_TOPIC,
     PRIVATE_APP_TOPIC,
+    MeshtasticConnectionGateway,
     MeshtasticTransport,
     MeshtasticUnavailableError,
     SerialMeshtasticChannelDiscovery,
 )
 from solora.application.transport_ports import InboundFrame, TrafficPriority, TransportError
+from solora.domain.meshtastic_settings import (
+    MeshtasticConnectionConfig,
+    MeshtasticConnectionType,
+)
 from solora.domain.protocol import MESHTASTIC_DATA_PAYLOAD_MAX
 
 
@@ -53,6 +59,7 @@ class FakeInterface:
         channels: list[SimpleNamespace] | None = None,
     ) -> None:
         self.myInfo = SimpleNamespace(my_node_num=node_id)
+        self.metadata = SimpleNamespace(firmware_version="2.7.22")
         self.localNode = SimpleNamespace(channels=channels or [_channel(0, "Primary", 1)])
         self.queueStatus: object | None = SimpleNamespace(free=2)
         self.sent: list[tuple[bytes, int, dict[str, object]]] = []
@@ -73,6 +80,9 @@ class FakeInterface:
 
     def close(self) -> None:
         self.closed = True
+
+    def getLongName(self) -> str:  # noqa: N802 - mirrors the official Meshtastic API
+        return "SOL7"
 
 
 def _transport(
@@ -266,6 +276,8 @@ def test_open_serial_uses_injected_official_runtime(monkeypatch: pytest.MonkeyPa
 
     runtime = meshtastic._MeshtasticRuntime(
         serial_factory=cast(meshtastic._SerialFactory, open_device),
+        tcp_factory=cast(meshtastic._TCPFactory, lambda _hostname: interface),
+        list_ports=cast(meshtastic._PortLister, lambda: ()),
         publisher=publisher,
         private_app=256,
         payload_limit=233,
@@ -286,7 +298,12 @@ def test_open_serial_closes_interface_when_initialization_fails(
 ) -> None:
     interface = FakeInterface(node_id=0)
     runtime = meshtastic._MeshtasticRuntime(
-        serial_factory=cast(meshtastic._SerialFactory, lambda _device=None: interface),
+        serial_factory=cast(
+            meshtastic._SerialFactory,
+            lambda _device=None, **_kwargs: interface,
+        ),
+        tcp_factory=cast(meshtastic._TCPFactory, lambda _hostname: interface),
+        list_ports=cast(meshtastic._PortLister, lambda: ()),
         publisher=FakePublisher(),
         private_app=256,
         payload_limit=233,
@@ -308,6 +325,8 @@ def test_open_serial_maps_sdk_open_error(monkeypatch: pytest.MonkeyPatch) -> Non
 
     runtime = meshtastic._MeshtasticRuntime(
         serial_factory=cast(meshtastic._SerialFactory, fail_open),
+        tcp_factory=cast(meshtastic._TCPFactory, lambda _hostname: FakeInterface()),
+        list_ports=cast(meshtastic._PortLister, lambda: ()),
         publisher=FakePublisher(),
         private_app=256,
         payload_limit=233,
@@ -339,7 +358,12 @@ def test_discovery_returns_enabled_public_metadata_and_closes(
         [_channel(0, "", 1), _channel(3, "solora-link"), _channel(4, "hidden", 0)],
     )
     runtime = meshtastic._MeshtasticRuntime(
-        serial_factory=cast(meshtastic._SerialFactory, lambda _device=None: interface),
+        serial_factory=cast(
+            meshtastic._SerialFactory,
+            lambda _device=None, **_kwargs: interface,
+        ),
+        tcp_factory=cast(meshtastic._TCPFactory, lambda _hostname: interface),
+        list_ports=cast(meshtastic._PortLister, lambda: ()),
         publisher=FakePublisher(),
         private_app=256,
         payload_limit=233,
@@ -366,6 +390,8 @@ def test_open_serial_requires_exact_enabled_channel_binding(
     interface = FakeInterface(channels=[_channel(3, "solora-link")])
     runtime = meshtastic._MeshtasticRuntime(
         serial_factory=cast(meshtastic._SerialFactory, lambda _device=None: interface),
+        tcp_factory=cast(meshtastic._TCPFactory, lambda _hostname: interface),
+        list_ports=cast(meshtastic._PortLister, lambda: ()),
         publisher=FakePublisher(),
         private_app=256,
         payload_limit=233,
@@ -378,6 +404,99 @@ def test_open_serial_requires_exact_enabled_channel_binding(
     with pytest.raises(TransportError, match="no longer match"):
         MeshtasticTransport.open_serial(channel_index=3, channel_name="renamed")
 
+    assert interface.closed
+
+
+def test_gateway_lists_cross_platform_serial_devices_without_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    serial_opens: list[str | None] = []
+
+    def open_serial(device: str | None = None, **_kwargs: object) -> FakeInterface:
+        serial_opens.append(device)
+        return FakeInterface()
+
+    runtime = meshtastic._MeshtasticRuntime(
+        serial_factory=cast(meshtastic._SerialFactory, open_serial),
+        tcp_factory=cast(meshtastic._TCPFactory, lambda _hostname: FakeInterface()),
+        list_ports=cast(
+            meshtastic._PortLister,
+            lambda: (
+                SimpleNamespace(device="COM7", description="Meshtastic USB", vid=0x303A),
+                SimpleNamespace(device="/dev/ttyS0", description="Serial port", vid=None),
+            ),
+        ),
+        publisher=FakePublisher(),
+        private_app=256,
+        payload_limit=233,
+        background_priority=10,
+        reliable_priority=70,
+        disabled_channel_role=0,
+    )
+    monkeypatch.setattr(meshtastic, "_load_runtime", lambda: runtime)
+
+    devices = MeshtasticConnectionGateway().list_devices()
+
+    assert [(device.path, device.connection_type) for device in devices] == [
+        ("/dev/ttyS0", MeshtasticConnectionType.SERIAL),
+        ("COM7", MeshtasticConnectionType.USB),
+    ]
+    assert serial_opens == []
+
+
+@pytest.mark.parametrize(
+    ("connection_type", "endpoint", "expected_serial", "expected_network"),
+    [
+        (MeshtasticConnectionType.USB, "COM7", ["COM7"], []),
+        (MeshtasticConnectionType.SERIAL, "/dev/ttyS0", ["/dev/ttyS0"], []),
+        (MeshtasticConnectionType.NETWORK, "mesh.local", [], ["mesh.local"]),
+    ],
+)
+def test_gateway_opens_usb_serial_and_network_through_one_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+    connection_type: MeshtasticConnectionType,
+    endpoint: str,
+    expected_serial: list[str],
+    expected_network: list[str],
+) -> None:
+    interface = FakeInterface(channels=[_channel(3, "solora-link")])
+    publisher = FakePublisher()
+    serial_opens: list[str | None] = []
+    network_opens: list[str] = []
+
+    def open_serial(device: str | None = None, **_kwargs: object) -> FakeInterface:
+        serial_opens.append(device)
+        return interface
+
+    def open_network(hostname: str, **_kwargs: object) -> FakeInterface:
+        network_opens.append(hostname)
+        return interface
+
+    runtime = meshtastic._MeshtasticRuntime(
+        serial_factory=cast(meshtastic._SerialFactory, open_serial),
+        tcp_factory=cast(meshtastic._TCPFactory, open_network),
+        list_ports=cast(meshtastic._PortLister, lambda: ()),
+        publisher=publisher,
+        private_app=256,
+        payload_limit=233,
+        background_priority=10,
+        reliable_priority=70,
+        disabled_channel_role=0,
+    )
+    monkeypatch.setattr(meshtastic, "_load_runtime", lambda: runtime)
+    gateway = MeshtasticConnectionGateway()
+
+    snapshot = gateway.discover(MeshtasticConnectionConfig(connection_type, endpoint))
+
+    assert serial_opens == expected_serial
+    assert network_opens == expected_network
+    assert snapshot.node_name == "SOL7"
+    assert snapshot.firmware_version == "2.7.22"
+    assert gateway.connected
+
+    publisher.publish(CONNECTION_LOST_TOPIC, {}, interface)
+    assert not gateway.connected
+    gateway.close()
     assert interface.closed
 
 

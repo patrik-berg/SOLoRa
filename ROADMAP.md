@@ -29,6 +29,8 @@
 - [x] Cover serial mapping, routing-ACK isolation, queue errors, and selection with hardware-free mocks.
 - [x] Discover enabled node channels and persist an exact, user-confirmed node/name/index binding.
 - [x] Restrict `PRIVATE_APP` transmit and receive to the selected local channel without exposing PSKs.
+- [x] Add persisted, web-managed USB/serial/network configuration and cross-platform device discovery.
+- [x] Show local node identity, firmware, latest contact, connection loss, and a home-page status link.
 - [x] Add explicit `SYNC` inventories, batched `WANT`, missing-thread repair, and idempotent object transfer.
 - [x] Prove offline → reconnect → packet loss → bidirectional convergence with virtual nodes.
 - [ ] **Required Phase 2 validation gate:** execute the documented end-to-end procedure with two physical Meshtastic nodes.

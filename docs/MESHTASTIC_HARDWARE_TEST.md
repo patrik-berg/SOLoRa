@@ -9,6 +9,8 @@ This procedure validates the thin serial transport only. It does not enable full
 - No Meshtastic desktop/mobile client holding either serial port open.
 - Python dependencies installed with `make setup-radio`.
 
+Before the CLI checks, use **Systeminställningar → Meshtastic** to refresh devices, select USB/Serial or Network, test the connection, verify node name/ID/firmware, and confirm the channel. Disconnect the node and verify that local status changes to offline without presenting this as mesh reachability.
+
 List serial ports on macOS:
 
 ```sh

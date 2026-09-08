@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from importlib import import_module
 from typing import Protocol, TypeGuard, cast
@@ -13,11 +13,19 @@ from solora.application.transport_ports import (
     TrafficPriority,
     TransportError,
 )
-from solora.domain.meshtastic_settings import MeshtasticChannel, MeshtasticNodeChannels
+from solora.domain.meshtastic_settings import (
+    MeshtasticChannel,
+    MeshtasticConnectionConfig,
+    MeshtasticConnectionType,
+    MeshtasticDevice,
+    MeshtasticNodeChannels,
+)
 from solora.domain.protocol import MESHTASTIC_DATA_PAYLOAD_MAX
 
 PRIVATE_APP_TOPIC = "meshtastic.receive.data.PRIVATE_APP"
+CONNECTION_LOST_TOPIC = "meshtastic.connection.lost"
 BROADCAST_NODE_ID = 0xFFFFFFFF
+CONNECTION_TIMEOUT_SECONDS = 15
 
 
 class MeshtasticUnavailableError(TransportError):
@@ -36,7 +44,19 @@ class _MeshtasticInterface(Protocol):
 
 
 class _SerialFactory(Protocol):
-    def __call__(self, device_path: str | None = None) -> _MeshtasticInterface: ...
+    def __call__(
+        self,
+        device_path: str | None = None,
+        **kwargs: object,
+    ) -> _MeshtasticInterface: ...
+
+
+class _TCPFactory(Protocol):
+    def __call__(self, hostname: str, **kwargs: object) -> _MeshtasticInterface: ...
+
+
+class _PortLister(Protocol):
+    def __call__(self) -> Iterable[object]: ...
 
 
 class _Publisher(Protocol):
@@ -48,12 +68,110 @@ class _Publisher(Protocol):
 @dataclass(frozen=True, slots=True)
 class _MeshtasticRuntime:
     serial_factory: _SerialFactory
+    tcp_factory: _TCPFactory
+    list_ports: _PortLister
     publisher: _Publisher
     private_app: int
     payload_limit: int
     background_priority: int
     reliable_priority: int
     disabled_channel_role: int
+
+
+class MeshtasticConnectionGateway:
+    """Own one explicitly opened local SDK connection across supported transports."""
+
+    def __init__(self) -> None:
+        self._interface: _MeshtasticInterface | None = None
+        self._publisher: _Publisher | None = None
+        self._connected = False
+
+    @property
+    def connected(self) -> bool:
+        return self._connected and self._interface is not None
+
+    def list_devices(self) -> tuple[MeshtasticDevice, ...]:
+        """List cross-platform serial endpoints without opening a radio."""
+        runtime = _load_runtime()
+        devices: list[MeshtasticDevice] = []
+        for port in runtime.list_ports():
+            path = getattr(port, "device", None)
+            if not isinstance(path, str) or not path:
+                continue
+            description = getattr(port, "description", None)
+            label = (
+                description
+                if isinstance(description, str)
+                and description
+                and description.casefold() not in {"n/a", "unknown"}
+                else path
+            )
+            is_usb = getattr(port, "vid", None) is not None
+            devices.append(
+                MeshtasticDevice(
+                    path=path,
+                    label=label,
+                    connection_type=(
+                        MeshtasticConnectionType.USB if is_usb else MeshtasticConnectionType.SERIAL
+                    ),
+                )
+            )
+        return tuple(sorted(devices, key=lambda device: device.path.casefold()))
+
+    def discover(self, config: MeshtasticConnectionConfig) -> MeshtasticNodeChannels:
+        """Open and retain the chosen connection, then inspect safe public metadata."""
+        self.close()
+        runtime = _load_runtime()
+        try:
+            if config.connection_type is MeshtasticConnectionType.NETWORK:
+                interface = runtime.tcp_factory(
+                    config.endpoint,
+                    timeout=CONNECTION_TIMEOUT_SECONDS,
+                )
+            else:
+                interface = runtime.serial_factory(
+                    config.endpoint or None,
+                    timeout=CONNECTION_TIMEOUT_SECONDS,
+                )
+        except Exception as error:
+            raise TransportError(f"Could not connect to Meshtastic node: {error}") from error
+
+        try:
+            snapshot = MeshtasticNodeChannels(
+                node_id=_read_node_id(interface),
+                connection_type=config.connection_type,
+                channels=_read_channels(interface, runtime.disabled_channel_role),
+                endpoint=config.endpoint,
+                node_name=_read_node_name(interface),
+                firmware_version=_read_firmware_version(interface),
+            )
+            runtime.publisher.subscribe(self._on_connection_lost, CONNECTION_LOST_TOPIC)
+        except Exception:
+            interface.close()
+            raise
+        self._interface = interface
+        self._publisher = runtime.publisher
+        self._connected = True
+        return snapshot
+
+    def close(self) -> None:
+        interface = self._interface
+        publisher = self._publisher
+        self._interface = None
+        self._publisher = None
+        self._connected = False
+        if publisher is not None:
+            publisher.unsubscribe(self._on_connection_lost, CONNECTION_LOST_TOPIC)
+        if interface is not None:
+            interface.close()
+
+    def _on_connection_lost(
+        self,
+        interface: object | None = None,
+        **_kwargs: object,
+    ) -> None:
+        if interface is None or interface is self._interface:
+            self._connected = False
 
 
 class SerialMeshtasticChannelDiscovery:
@@ -63,19 +181,16 @@ class SerialMeshtasticChannelDiscovery:
         self.device = device
 
     def discover(self) -> MeshtasticNodeChannels:
-        runtime = _load_runtime()
+        gateway = MeshtasticConnectionGateway()
         try:
-            interface = runtime.serial_factory(self.device)
-        except Exception as error:
-            raise TransportError(f"Could not open Meshtastic serial device: {error}") from error
-        try:
-            return MeshtasticNodeChannels(
-                node_id=_read_node_id(interface),
-                connection_type="serial",
-                channels=_read_channels(interface, runtime.disabled_channel_role),
+            return gateway.discover(
+                MeshtasticConnectionConfig(
+                    MeshtasticConnectionType.SERIAL,
+                    self.device or "",
+                )
             )
         finally:
-            interface.close()
+            gateway.close()
 
 
 class MeshtasticTransport:
@@ -131,6 +246,43 @@ class MeshtasticTransport:
             interface = runtime.serial_factory(device)
         except Exception as error:
             raise TransportError(f"Could not open Meshtastic serial device: {error}") from error
+        try:
+            _validate_channel(
+                interface,
+                channel_index=channel_index,
+                channel_name=channel_name,
+                disabled_role=runtime.disabled_channel_role,
+            )
+            return cls(
+                interface,
+                runtime.publisher,
+                private_app=runtime.private_app,
+                payload_limit=runtime.payload_limit,
+                background_priority=runtime.background_priority,
+                reliable_priority=runtime.reliable_priority,
+                channel_index=channel_index,
+                channel_name=channel_name,
+                hop_limit=hop_limit,
+            )
+        except Exception:
+            interface.close()
+            raise
+
+    @classmethod
+    def open_network(
+        cls,
+        hostname: str,
+        *,
+        channel_index: int = 0,
+        channel_name: str | None = None,
+        hop_limit: int | None = None,
+    ) -> MeshtasticTransport:
+        """Open an official Meshtastic ``TCPInterface``."""
+        runtime = _load_runtime()
+        try:
+            interface = runtime.tcp_factory(hostname)
+        except Exception as error:
+            raise TransportError(f"Could not open Meshtastic network node: {error}") from error
         try:
             _validate_channel(
                 interface,
@@ -288,6 +440,20 @@ def _read_node_id(interface: _MeshtasticInterface) -> int:
     return node_id
 
 
+def _read_node_name(interface: _MeshtasticInterface) -> str | None:
+    getter = getattr(interface, "getLongName", None)
+    if not callable(getter):
+        return None
+    name = getter()
+    return name if isinstance(name, str) and name else None
+
+
+def _read_firmware_version(interface: _MeshtasticInterface) -> str | None:
+    metadata = getattr(interface, "metadata", None)
+    version = getattr(metadata, "firmware_version", None)
+    return version if isinstance(version, str) and version else None
+
+
 def _read_channels(
     interface: _MeshtasticInterface,
     disabled_role: int,
@@ -344,10 +510,12 @@ def _queue_is_full(interface: _MeshtasticInterface) -> bool:
 def _load_runtime() -> _MeshtasticRuntime:
     try:
         serial_module = import_module("meshtastic.serial_interface")
+        tcp_module = import_module("meshtastic.tcp_interface")
         channel_module = import_module("meshtastic.protobuf.channel_pb2")
         mesh_module = import_module("meshtastic.protobuf.mesh_pb2")
         portnums_module = import_module("meshtastic.protobuf.portnums_pb2")
         publisher = import_module("pubsub").pub
+        list_ports = import_module("serial.tools.list_ports").comports
     except (ImportError, AttributeError) as error:
         raise MeshtasticUnavailableError(
             "Meshtastic support is not installed; run 'make setup-radio'"
@@ -359,6 +527,8 @@ def _load_runtime() -> _MeshtasticRuntime:
     portnums = portnums_module.PortNum
     return _MeshtasticRuntime(
         serial_factory=cast(_SerialFactory, serial_module.SerialInterface),
+        tcp_factory=cast(_TCPFactory, tcp_module.TCPInterface),
+        list_ports=cast(_PortLister, list_ports),
         publisher=cast(_Publisher, publisher),
         private_app=int(portnums.PRIVATE_APP),
         payload_limit=int(constants.DATA_PAYLOAD_LEN),

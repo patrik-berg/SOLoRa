@@ -82,6 +82,23 @@ header {
   color: #bdd0e4;
 }
 
+.connection-pill {
+  border-color: #30495b;
+  background: #102534;
+  box-shadow: none;
+  color: #bdd0e4;
+  font-size: 0.8rem;
+}
+
+.connection-pill.online {
+  border-color: rgb(58 218 151 / 38%);
+  color: #55e6a4;
+}
+
+.connection-pill.offline span {
+  color: #ef6a79;
+}
+
 h1,
 h2,
 p {
@@ -255,6 +272,44 @@ select:focus {
   line-height: 1.55;
 }
 
+.connection-types {
+  display: flex;
+  margin: 0 0 1rem;
+  border: 1px solid #263d4e;
+  border-radius: 0.45rem;
+  gap: 1rem;
+  padding: 0.8rem 1rem 0.65rem;
+}
+
+.connection-types legend {
+  color: #bdd0e4;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0 0.3rem;
+}
+
+.connection-types label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  gap: 0.4rem;
+}
+
+.connection-types input {
+  width: auto;
+  accent-color: #348bf2;
+}
+
+.connection-input {
+  display: grid;
+  margin-bottom: 0.8rem;
+  gap: 0.55rem;
+}
+
+.connection-input .secondary-button {
+  justify-self: start;
+}
+
 .radio-status {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -291,6 +346,16 @@ select:focus {
   display: grid;
   margin-top: 1.25rem;
   gap: 0.7rem;
+}
+
+.channel-picker h3 {
+  margin: 0.25rem 0 0;
+}
+
+.channel-picker p {
+  color: #a9bfd3;
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 .channel-picker select {
@@ -412,6 +477,10 @@ time {
   font-size: 1.65rem;
 }
 
+.setup-link {
+  margin-top: 1.2rem;
+}
+
 .posts {
   display: flex;
   flex: 1;
@@ -496,6 +565,21 @@ footer {
 
   header {
     align-items: flex-start;
+  }
+
+  .header-actions {
+    align-items: flex-end;
+    flex-direction: column-reverse;
+  }
+
+  .connection-types,
+  .radio-status {
+    grid-template-columns: 1fr;
+  }
+
+  .connection-types {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .local-badge {
