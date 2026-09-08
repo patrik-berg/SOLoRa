@@ -161,8 +161,8 @@ remain out of scope. Physical two-radio and Zero 2 W performance gates remain op
 | Target | PR A evidence | Still required |
 | --- | --- | --- |
 | macOS ARM | Source runtime + real Tk scripted lifecycle | Interactive UX, default browser, packaged app/login/icon |
-| Windows x64 | Native runtime CI configured | Green native CI, real window and packaged lifecycle/login |
+| Windows x64 | Native runtime CI passed | Real window and packaged lifecycle/login |
 | macOS Intel | Shared portable code only | Native build and full desktop matrix in PR B |
-| Linux x64 | Headless/runtime integration CI | Installed service/reboot/upgrade in PR B |
+| Linux x64 | Full suite and headless/runtime integration CI passed | Installed service/reboot/upgrade in PR B |
 | Pi 4/5 | Shared GUI-free runtime architecture | Native package, physical install/reboot/LAN/USB/persistence |
 | Zero 2 W | No headless GUI imports; no image | Later boot/RAM/CPU/SQLite/web/sync/authority/stability gate |

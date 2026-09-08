@@ -103,6 +103,8 @@ def test_config_persistence_validation_and_urls(runtime: RuntimePaths) -> None:
     )
     with pytest.raises(ValueError, match="Confirm LAN"):
         RuntimeConfig(bind="192.168.1.2")
+    with pytest.raises(ValueError, match="address string"):
+        RuntimeConfig(bind=1234)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="booleans"):
         RuntimeConfig(start_minimized=1)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="mode"):

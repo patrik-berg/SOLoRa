@@ -20,6 +20,8 @@ class RuntimeConfig:
 
     def __post_init__(self) -> None:
         # IPv4 only for v1 bootstrap; do not implicitly enable IPv6 dual stack.
+        if not isinstance(self.bind, str):
+            raise ValueError("Bind must be an IPv4 address string")
         address = ipaddress.IPv4Address(self.bind)
         if address.is_multicast or self.bind == "255.255.255.255":
             raise ValueError("Bind must be a local unicast or wildcard IPv4 address")
