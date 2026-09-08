@@ -57,6 +57,18 @@ export type MeshtasticSettings = {
   error: string | null
 }
 
+export type SystemRole = 'CLIENT' | 'PRIMARY' | 'BACKUP'
+
+export type SystemSettings = {
+  system_name: string
+  system_role: SystemRole
+  role_status: 'active' | 'experimental'
+  meshtastic_node_id: number | null
+  primary_authority_node_id: number | null
+  app_version: string
+  protocol_version: number
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
@@ -121,5 +133,24 @@ export function selectMeshtasticChannel(
   return request('/api/settings/meshtastic/channel', {
     method: 'PUT',
     body: JSON.stringify({ channel_index: channelIndex, channel_name: channelName }),
+  })
+}
+
+export function getSystemSettings(): Promise<SystemSettings> {
+  return request('/api/settings/system')
+}
+
+export function updateSystemSettings(
+  systemName: string,
+  systemRole: SystemRole,
+  confirmRoleChange: boolean,
+): Promise<SystemSettings> {
+  return request('/api/settings/system', {
+    method: 'PUT',
+    body: JSON.stringify({
+      system_name: systemName,
+      system_role: systemRole,
+      confirm_role_change: confirmRoleChange,
+    }),
   })
 }

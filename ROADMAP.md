@@ -31,11 +31,15 @@
 - [x] Restrict `PRIVATE_APP` transmit and receive to the selected local channel without exposing PSKs.
 - [x] Add persisted, web-managed USB/serial/network configuration and cross-platform device discovery.
 - [x] Show local node identity, firmware, latest contact, connection loss, and a home-page status link.
+- [x] Persist an explicit system name and `CLIENT`/`PRIMARY`/`BACKUP` role independently.
+- [x] Add role-change confirmation, header identity, and browser-visible diagnostics.
+- [x] Define future authority identity as explicit role plus Meshtastic Node ID, never `SOL1`.
 - [x] Add explicit `SYNC` inventories, batched `WANT`, missing-thread repair, and idempotent object transfer.
 - [x] Prove offline → reconnect → packet loss → bidirectional convergence with virtual nodes.
 - [ ] **Required Phase 2 validation gate:** execute the documented end-to-end procedure with two physical Meshtastic nodes.
 - [ ] Measure real payload overhead, airtime, queue behavior, ACKs, and channel utilization.
 - [ ] Decide fragmentation and automatic scheduling only after physical-radio measurements.
+- [ ] Implement Primary/Backup sequencing, replication, discovery, and failover semantics; stored server roles remain experimental until then.
 
 ## Phase 3 — Beta delivery
 

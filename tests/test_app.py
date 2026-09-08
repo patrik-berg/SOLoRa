@@ -44,6 +44,7 @@ def test_migration_creates_forum_schema(tmp_path: Path) -> None:
         "repair_requests",
         "meshtastic_settings",
         "meshtastic_connection",
+        "system_settings",
     }
 
 
@@ -340,3 +341,61 @@ def test_connection_types_and_missing_node_have_clear_hardware_free_results(
             json={"connection_type": "network", "endpoint": "   "},
         )
         assert blank.status_code == 422
+
+
+def test_system_identity_role_is_explicit_persistent_and_uses_node_id(
+    tmp_path: Path,
+) -> None:
+    database_url = _database_url(tmp_path)
+    _migrate(database_url)
+    gateway = FakeMeshtasticGateway()
+
+    with TestClient(create_app(database_url=database_url, meshtastic_gateway=gateway)) as client:
+        initial = client.get("/api/settings/system").json()
+        assert initial["system_name"] == "SOLoRa Node"
+        assert initial["system_role"] == "CLIENT"
+        assert initial["primary_authority_node_id"] is None
+
+        named_sol1 = client.put(
+            "/api/settings/system",
+            json={"system_name": "SOL1", "system_role": "CLIENT"},
+        )
+        assert named_sol1.status_code == 200
+        assert named_sol1.json()["system_role"] == "CLIENT"
+        assert named_sol1.json()["primary_authority_node_id"] is None
+
+        client.post(
+            "/api/settings/meshtastic/test",
+            json={"connection_type": "network", "endpoint": "base-north.local"},
+        )
+        unconfirmed = client.put(
+            "/api/settings/system",
+            json={"system_name": "Base North", "system_role": "PRIMARY"},
+        )
+        assert unconfirmed.status_code == 409
+
+        promoted = client.put(
+            "/api/settings/system",
+            json={
+                "system_name": "Base North",
+                "system_role": "PRIMARY",
+                "confirm_role_change": True,
+            },
+        )
+        assert promoted.status_code == 200
+        assert promoted.json()["role_status"] == "experimental"
+        assert promoted.json()["meshtastic_node_id"] == gateway.node_id
+        assert promoted.json()["primary_authority_node_id"] == gateway.node_id
+
+        renamed = client.put(
+            "/api/settings/system",
+            json={"system_name": "SOL1", "system_role": "PRIMARY"},
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["primary_authority_node_id"] == gateway.node_id
+
+    with TestClient(create_app(database_url=database_url)) as restarted_client:
+        persisted = restarted_client.get("/api/settings/system").json()
+        assert persisted["system_name"] == "SOL1"
+        assert persisted["system_role"] == "PRIMARY"
+        assert persisted["primary_authority_node_id"] == gateway.node_id

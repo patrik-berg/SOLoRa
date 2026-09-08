@@ -16,6 +16,20 @@ SOLoRa is local-first: reading and writing remain available without internet or 
 
 Dependencies point inward. Domain and application code do not import FastAPI, SQLAlchemy, Meshtastic, serial, TCP, BLE, or generated protobuf types.
 
+## System identity and role
+
+SOLoRa keeps three independent identity concepts:
+
+- `system_name` is user-managed display metadata such as `SOL1` or `Base North`.
+- Meshtastic `node_id` is the radio/network identity such as `!91ab22cd`.
+- `system_role` is explicit local behavior: `CLIENT`, `PRIMARY`, or `BACKUP`.
+
+`SOL1` is only a conventional name and has no protocol or authority meaning. Primary authority exists only when `system_role = PRIMARY` and is identified externally by Meshtastic Node ID. The domain's authority value intentionally contains no system name, preventing presentation metadata from becoming a routing or trust key.
+
+Name and role are persisted separately in SQLite and may change independently. A role transition requires explicit confirmation through both UI and API. `PRIMARY` and `BACKUP` can be stored for test environments but are currently marked experimental; this setting does not yet activate sequencing, authentication, replication, or failover behavior. A future promotion from Backup to Primary retains the node's actual Node ID and requires no rename.
+
+Future status/discovery may advertise `role`, `node_id`, optional `system_name`, `protocol_version`, `forum_revision`, and a server epoch or equivalent authority generation. Receivers must bind authority to role plus Node ID, never to a display name. This is a planned payload concept only; no v1 message layout or numeric type is changed here. Status should piggyback where possible and preserve **Normal state is silent**.
+
 ## Protocol allocation policy
 
 `PROTOCOL.md` is the authoritative SOLoRa message registry. The v1 envelope has a four-bit type field, so its small `0–15` namespace must not be allocated ad hoc in implementation code. Existing numeric meanings are immutable; removed values are not reused. A planned or reserved value becomes implemented only through a focused protocol change that defines its direction, priority, payload layout, size limits, failure behavior, canonical fixture, and compatibility tests. Value 15 remains reserved for future core expansion, with no extension encoding defined yet.
