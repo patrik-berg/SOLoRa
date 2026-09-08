@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from typing import Protocol, TypeGuard, cast
 
+from solora.application.traffic import TrafficObservation, TrafficSink, observe
 from solora.application.transport_ports import (
     FrameReceiver,
     InboundFrame,
@@ -15,6 +16,7 @@ from solora.application.transport_ports import (
 )
 from solora.domain.meshtastic_settings import (
     MeshtasticChannel,
+    MeshtasticChannelSelection,
     MeshtasticConnectionConfig,
     MeshtasticConnectionType,
     MeshtasticDevice,
@@ -81,10 +83,41 @@ class _MeshtasticRuntime:
 class MeshtasticConnectionGateway:
     """Own one explicitly opened local SDK connection across supported transports."""
 
-    def __init__(self) -> None:
+    def __init__(self, traffic_sink: TrafficSink | None = None) -> None:
         self._interface: _MeshtasticInterface | None = None
         self._publisher: _Publisher | None = None
         self._connected = False
+        self._traffic_sink = traffic_sink
+        self._traffic_transport: MeshtasticTransport | None = None
+
+    def observe_channel(self, selection: MeshtasticChannelSelection | None) -> None:
+        """Attach passive RX to the existing connection; never open or send."""
+        if self._traffic_transport is not None:
+            self._traffic_transport.close()
+            self._traffic_transport = None
+        if selection is None or self._interface is None or not self.connected:
+            return
+        runtime = _load_runtime()
+        _validate_channel(
+            self._interface,
+            channel_index=selection.channel_index,
+            channel_name=selection.channel_name,
+            disabled_role=runtime.disabled_channel_role,
+        )
+        if _read_node_id(self._interface) != selection.node_id:
+            return
+        self._traffic_transport = MeshtasticTransport(
+            self._interface,
+            runtime.publisher,
+            private_app=runtime.private_app,
+            payload_limit=runtime.payload_limit,
+            background_priority=runtime.background_priority,
+            reliable_priority=runtime.reliable_priority,
+            channel_index=selection.channel_index,
+            channel_name=selection.channel_name,
+            traffic_sink=self._traffic_sink,
+            owns_interface=False,
+        )
 
     @property
     def connected(self) -> bool:
@@ -155,6 +188,7 @@ class MeshtasticConnectionGateway:
         return snapshot
 
     def close(self) -> None:
+        self.observe_channel(None)
         interface = self._interface
         publisher = self._publisher
         self._interface = None
@@ -172,6 +206,7 @@ class MeshtasticConnectionGateway:
     ) -> None:
         if interface is None or interface is self._interface:
             self._connected = False
+            self.observe_channel(None)
 
 
 class SerialMeshtasticChannelDiscovery:
@@ -208,6 +243,8 @@ class MeshtasticTransport:
         channel_index: int = 0,
         channel_name: str | None = None,
         hop_limit: int | None = None,
+        traffic_sink: TrafficSink | None = None,
+        owns_interface: bool = True,
     ) -> None:
         if payload_limit <= 0:
             raise ValueError("Meshtastic payload limit must be positive")
@@ -217,6 +254,8 @@ class MeshtasticTransport:
             raise ValueError("Meshtastic hop limit must be between 0 and 7")
 
         self._interface = interface
+        self._traffic_sink = traffic_sink
+        self._owns_interface = owns_interface
         self._publisher = publisher
         self._private_app = private_app
         self._payload_limit = min(payload_limit, MESHTASTIC_DATA_PAYLOAD_MAX)
@@ -239,6 +278,7 @@ class MeshtasticTransport:
         channel_index: int = 0,
         channel_name: str | None = None,
         hop_limit: int | None = None,
+        traffic_sink: TrafficSink | None = None,
     ) -> MeshtasticTransport:
         """Open an official Meshtastic ``SerialInterface``."""
         runtime = _load_runtime()
@@ -263,6 +303,7 @@ class MeshtasticTransport:
                 channel_index=channel_index,
                 channel_name=channel_name,
                 hop_limit=hop_limit,
+                traffic_sink=traffic_sink,
             )
         except Exception:
             interface.close()
@@ -276,6 +317,7 @@ class MeshtasticTransport:
         channel_index: int = 0,
         channel_name: str | None = None,
         hop_limit: int | None = None,
+        traffic_sink: TrafficSink | None = None,
     ) -> MeshtasticTransport:
         """Open an official Meshtastic ``TCPInterface``."""
         runtime = _load_runtime()
@@ -300,6 +342,7 @@ class MeshtasticTransport:
                 channel_index=channel_index,
                 channel_name=channel_name,
                 hop_limit=hop_limit,
+                traffic_sink=traffic_sink,
             )
         except Exception:
             interface.close()
@@ -362,19 +405,48 @@ class MeshtasticTransport:
                 },
             )
         except Exception as error:
+            self._observe("TX", self.node_id, destination, payload, "Transport error")
             raise TransportError(f"Meshtastic send failed: {error}") from error
 
         packet_id = getattr(packet, "id", None)
         if not isinstance(packet_id, int) or isinstance(packet_id, bool) or packet_id == 0:
+            self._observe("TX", self.node_id, destination, payload, "Transport error")
             raise TransportError("Meshtastic SDK did not return a valid packet ID")
         self._last_packet_id = packet_id
+        self._observe("TX", self.node_id, destination, payload, "Sent", packet_id)
+
+    def _observe(
+        self,
+        direction: str,
+        source: int,
+        destination: int,
+        payload: bytes,
+        status: str,
+        packet_id: int | None = None,
+    ) -> None:
+        observe(
+            self._traffic_sink,
+            TrafficObservation(
+                "TX" if direction == "TX" else "RX",
+                source,
+                destination,
+                payload,
+                self.channel_name,
+                self.channel_index,
+                self._private_app,
+                "meshtastic",
+                status,
+                packet_id,
+            ),
+        )
 
     def close(self) -> None:
         if self._closed:
             return
         self._closed = True
         self._publisher.unsubscribe(self._on_receive, PRIVATE_APP_TOPIC)
-        self._interface.close()
+        if self._owns_interface:
+            self._interface.close()
 
     def _on_receive(
         self,
@@ -390,8 +462,10 @@ class MeshtasticTransport:
             payload_limit=self._payload_limit,
             channel_index=self._channel_index,
         )
-        if frame is not None and self._receiver is not None:
-            self._receiver(frame)
+        if frame is not None:
+            self._observe("RX", frame.source, frame.destination, frame.payload, "Received")
+            if self._receiver is not None:
+                self._receiver(frame)
 
 
 def _decode_inbound(

@@ -74,6 +74,15 @@ Repair begins only when a caller invokes `request_sync(peer)`; idle nodes emit n
 
 ## Validation and compatibility
 
+Passive diagnostics reuse these codecs and the implemented `MessageType` names;
+they do not allocate, activate or change message IDs. The diagnostic disclosure
+allowlist currently permits v1 types 1–6 only. Reserved AUTH 12/13 and all unknown
+types/versions are hidden before buffering, including raw bytes and IDs. New
+message implementations require a separate sensitive-field/redaction review before
+their content is exposed. Known malformed public types may retain their exact HEX.
+Observing `COMMIT_ACK` is distinct from SDK acceptance or routing ACK; the log does
+not infer authority or persistence independently. [Details](docs/TRAFFIC_LOG.md).
+
 Parsers reject unknown versions/types/object kinds, zero or malformed IDs, duplicate or truncated reference lists, invalid UTF-8, invalid thread IDs, illegal correlations, and frames over 233 bytes before persistence. Every wire change requires updated fixtures under `protocol/fixtures/` and must retain safe handling of duplicates and malformed input.
 
 ## Sources checked for v1

@@ -1,5 +1,35 @@
 # Meshtastic Two-Radio Test
 
+## Traffic Log comparison gate (pending hardware)
+
+Use **Trafiklogg** on both nodes with the same logical channel confirmed independently
+on each local slot. The page itself must remain radio-silent. Keep both exports.
+
+1. Open node A and node B's logs, verify application/node status and local channel.
+2. Send normal forum-protocol work through the existing SyncNode transport harness.
+3. Match A's TX and B's RX by message ID, type and **exact complete HEX**.
+4. Verify source/destination; the local channel names must match the intended
+   binding, but local indices may differ. Do not require equal indices.
+5. Compare THREAD and SYNC_POST, then the reverse application COMMIT_ACK and its
+   correlation ID. SDK Sent does not imply receipt or durable commit.
+6. Introduce loss/offline/reconnect using the existing procedure; verify repeated
+   TX/RX IDs, unchanged HEX and a single stored forum object after deduplication.
+7. Confirm wrong-channel/ROUTING_APP/text activity is absent from this log.
+8. Pause/filter/copy/export on both browsers and verify no additional transmissions.
+9. Export both JSON buffers before restart/eviction and compare IDs/HEX, not clocks
+   alone. Logs include public forum content; review before sharing.
+
+Runtime integration prerequisite: the SyncNode harness and its transport must run
+in the same process as that web app and receive `traffic_sink=app.state.traffic`.
+The current Settings connection already supports passive RX. Local forum HTTP
+writes do not yet drive a continuous SyncNode, and a separately launched CLI cannot
+populate another process's buffer. Do not claim the end-to-end forum/button gate
+passed until that existing deferred lifecycle integration and physical test exist.
+No send/replay button or injection HTTP API is added by diagnostics.
+
+See [Traffic Log contract](TRAFFIC_LOG.md). This gate remains **pending** and Phase 2
+must not be marked complete without the actual two-radio evidence.
+
 This procedure validates the thin serial transport only. It does not enable full forum synchronization, fragmentation, presence, or SOL1 behavior.
 
 ## Prerequisites

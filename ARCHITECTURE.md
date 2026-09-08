@@ -6,6 +6,20 @@ SOLoRa is local-first: reading and writing remain available without internet or 
 
 ## Components
 
+### Passive radio diagnostics
+
+Transport adapters optionally emit bounded `TrafficObservation` values to a
+failure-isolated `TrafficSink`. The runtime owns a 1000-event `TrafficBuffer`, not
+a packet database. Capture excludes unrelated ports/channels; public presentation
+reuses domain codecs outside the capture path. Unknown/sensitive payloads are hidden
+before retention. Local SSE delivers bounded deltas without touching radio APIs.
+The Settings gateway observes RX on its existing confirmed connection; transport
+instances used by a SyncNode must share the sink for TX/RX to appear in that process.
+This does not activate the deferred forum-sync runtime. Radio Traffic Log and future
+Application/System Log remain separate. See [Traffic Log](docs/TRAFFIC_LOG.md).
+
+### Application components
+
 1. **Web client** — React/TypeScript built by Vite; presentation state only.
 2. **API layer** — FastAPI routes and Pydantic HTTP schemas.
 3. **Application layer** — forum use cases plus the hardware-independent `SyncNode` orchestration service.

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from solora.adapters.persistence.database import Database
 from solora.adapters.transport.meshtastic import MeshtasticConnectionGateway
 from solora.application.meshtastic_settings import MeshtasticGateway, MeshtasticSettingsController
+from solora.application.traffic import TrafficBuffer
 from solora.config import APP_VERSION, DEFAULT_FRONTEND_PATH
 from solora.config import database_url as default_database_url
 from solora.runtime.health import readiness
@@ -20,6 +21,7 @@ from solora.runtime.paths import RuntimePaths
 from solora.runtime.settings import ConfigStore, RuntimeConfig
 from solora.web.routes import router
 from solora.web.status import browser_status
+from solora.web.traffic import router as traffic_router
 
 
 def create_app(
@@ -33,8 +35,13 @@ def create_app(
     """Create the local SOLoRa web application."""
     database = Database(database_url or default_database_url())
 
+    traffic = TrafficBuffer()
+    gateway = meshtastic_gateway or MeshtasticConnectionGateway(traffic)
     settings_controller = MeshtasticSettingsController(
-        meshtastic_gateway or MeshtasticConnectionGateway()
+        gateway,
+        on_binding=gateway.observe_channel
+        if isinstance(gateway, MeshtasticConnectionGateway)
+        else None,
     )
 
     @asynccontextmanager
@@ -45,6 +52,7 @@ def create_app(
 
     application = FastAPI(title="SOLoRa", version=APP_VERSION, lifespan=lifespan)
     application.state.database = database
+    application.state.traffic = traffic
     application.state.meshtastic_settings = settings_controller
     application.add_middleware(
         CORSMiddleware,
@@ -53,6 +61,7 @@ def create_app(
         allow_headers=["*"],
     )
     application.include_router(router)
+    application.include_router(traffic_router)
 
     @application.get("/health", tags=["system"])
     def health() -> dict[str, str]:
