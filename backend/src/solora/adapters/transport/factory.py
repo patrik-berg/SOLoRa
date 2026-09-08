@@ -8,6 +8,7 @@ from enum import StrEnum
 
 from solora.adapters.transport.in_memory import InMemoryNetwork
 from solora.adapters.transport.meshtastic import MeshtasticTransport
+from solora.application.traffic import TrafficSink
 from solora.application.transport_ports import Transport
 
 __all__ = ["MeshtasticTransport", "TransportKind", "TransportSettings", "create_transport"]
@@ -52,6 +53,7 @@ def create_transport(
     *,
     node_id: int = 1,
     network: InMemoryNetwork | None = None,
+    traffic_sink: TrafficSink | None = None,
 ) -> Transport:
     """Create the configured adapter behind the common transport port."""
     if settings.kind is TransportKind.MESHTASTIC_SERIAL:
@@ -60,6 +62,7 @@ def create_transport(
             channel_index=settings.channel_index,
             channel_name=settings.channel_name,
             hop_limit=settings.hop_limit,
+            traffic_sink=traffic_sink,
         )
     if settings.kind is TransportKind.MESHTASTIC_NETWORK:
         if settings.network_host is None:
@@ -69,5 +72,6 @@ def create_transport(
             channel_index=settings.channel_index,
             channel_name=settings.channel_name,
             hop_limit=settings.hop_limit,
+            traffic_sink=traffic_sink,
         )
-    return (network or InMemoryNetwork()).connect(node_id)
+    return (network or InMemoryNetwork()).connect(node_id, traffic_sink=traffic_sink)

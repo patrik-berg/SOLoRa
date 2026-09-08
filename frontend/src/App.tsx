@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 
 import ApplicationStatusBar from './ApplicationStatusBar.tsx'
+import TrafficLog from './TrafficLog.tsx'
 import { useApplicationStatus } from './applicationStatus.ts'
 
 import {
@@ -54,7 +55,7 @@ export default function App() {
   const [newPost, setNewPost] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [view, setView] = useState<'forum' | 'settings'>('forum')
+  const [view, setView] = useState<'forum' | 'settings' | 'traffic'>('forum')
   const [settingsSection, setSettingsSection] = useState<'system' | 'meshtastic'>('system')
   const [system, setSystem] = useState<SystemSettings | null>(null)
   const [runtime, setRuntime] = useState<RuntimeSettings | null>(null)
@@ -263,7 +264,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={view === 'traffic' ? 'app-shell traffic-shell' : 'app-shell'}>
       <header>
         <div>
           <p className="eyebrow">Local forum · Phase 1</p>
@@ -289,10 +290,15 @@ export default function App() {
       </header>
 
       <ApplicationStatusBar status={applicationStatus} />
+      <nav className="app-navigation" aria-label="Huvudmeny">
+        <button type="button" aria-current={view === 'forum' ? 'page' : undefined} onClick={() => setView('forum')}>Forum</button>
+        <button type="button" aria-current={view === 'traffic' ? 'page' : undefined} onClick={() => setView('traffic')}>Trafiklogg</button>
+        <button type="button" aria-current={view === 'settings' ? 'page' : undefined} onClick={() => void openSettings()}>Inställningar</button>
+      </nav>
 
       {error && !applicationOffline && <p className="error" role="alert">{error}</p>}
 
-      {view === 'settings' ? (
+      {view === 'traffic' ? <TrafficLog offline={applicationOffline} channel={radio?.selection?.channel_name ?? null} /> : view === 'settings' ? (
         <main className="settings-main">
           <section className="settings-card" aria-busy={radioLoading || systemLoading}>
             <button className="back-button" onClick={() => setView('forum')} type="button">

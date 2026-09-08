@@ -11,6 +11,7 @@ from solora.adapters.transport.factory import (
     create_transport,
 )
 from solora.adapters.transport.in_memory import InMemoryTransport
+from solora.application.traffic import TrafficSink
 from solora.transport_cli import main
 
 
@@ -49,6 +50,7 @@ def test_factory_delegates_serial_settings(monkeypatch: pytest.MonkeyPatch) -> N
         channel_index: int,
         channel_name: str | None,
         hop_limit: int | None,
+        traffic_sink: TrafficSink | None = None,
     ) -> InMemoryTransport:
         calls.append((device, channel_index, channel_name, hop_limit))
         return marker
@@ -78,6 +80,7 @@ def test_factory_delegates_network_settings(monkeypatch: pytest.MonkeyPatch) -> 
         channel_index: int,
         channel_name: str | None,
         hop_limit: int | None,
+        traffic_sink: TrafficSink | None = None,
     ) -> InMemoryTransport:
         del hop_limit
         calls.append((hostname, channel_index, channel_name))

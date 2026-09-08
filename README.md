@@ -1,5 +1,12 @@
 # SOLoRa
 
+## Trafiklogg
+
+Webbappens **Trafiklogg** visar passivt observerade SOLoRa TX/RX-frames med filter,
+avkodning, exakt HEX, parsing och JSON-export. Bufferten håller 1000 händelser i
+minnet. Ingen loggåtgärd skapar radiotrafik; lokala foruminlägg skickas fortfarande
+inte automatiskt. Se [diagnostikguiden](docs/TRAFFIC_LOG.md) för användning och gränser.
+
 SOLoRa is a local-first communication application. **Phase 1** provides a small forum that runs entirely on one computer: create threads, open them, and publish posts that remain in a local SQLite database. **Phase 2** adds binary two-node transport, durable retry, deduplication, explicit hardware-independent forum repair, and an initial USB/serial Meshtastic adapter. Accounts, automatic synchronization scheduling, and automatic releases are not implemented yet.
 
 Application version is defined in `backend/src/solora/version.py`; `uv run solora --version` reports it. It is independent of radio protocol version and is not a published stable release.

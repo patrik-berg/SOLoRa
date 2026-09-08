@@ -1,5 +1,15 @@
 # Roadmap
 
+## Phase 3A Diagnostics — Radio Traffic Log
+
+- [x] Passive bounded TX/RX observation, shared protocol decoders and privacy allowlist.
+- [x] Local SSE, channel metadata, filter/search, pause, HEX/parsed details and JSON export.
+- [x] Hardware-independent adapter/gateway/virtual-node and browser-component tests.
+- [ ] Physical two-radio comparison of actual TX/RX, IDs, channel, COMMIT_ACK and retries.
+
+This diagnostic feature does not complete Phase 2, activate a continuous forum-sync
+runtime or add Primary/Backup behavior. Physical validation remains mandatory.
+
 ## Phase 0 — Development foundation
 
 - [x] Initialize Git and connect GitHub.

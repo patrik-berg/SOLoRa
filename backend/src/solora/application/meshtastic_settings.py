@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Lock
@@ -69,8 +71,14 @@ class MeshtasticSettingsStatus:
 class MeshtasticSettingsController:
     """Cache explicit discovery without creating idle radio traffic."""
 
-    def __init__(self, gateway: MeshtasticGateway) -> None:
+    def __init__(
+        self,
+        gateway: MeshtasticGateway,
+        *,
+        on_binding: Callable[[MeshtasticChannelSelection | None], None] | None = None,
+    ) -> None:
         self._gateway = gateway
+        self._on_binding = on_binding
         self._snapshot: MeshtasticNodeChannels | None = None
         self._devices: tuple[MeshtasticDevice, ...] = ()
         self._discovery_error: str | None = None
@@ -110,6 +118,7 @@ class MeshtasticSettingsController:
     ) -> MeshtasticSettingsStatus:
         """Open the selected endpoint, read node details, and retain the live connection."""
         with self._lock:
+            self._notify_binding(None)
             previous = repository.get_connection()
             try:
                 snapshot = self._gateway.discover(config)
@@ -149,7 +158,11 @@ class MeshtasticSettingsController:
                         last_contact=datetime.now(UTC),
                     )
                 )
-            return self._status(repository)
+            result = self._status(repository)
+            self._notify_binding(
+                result.selection if result.selection_valid and result.connected else None
+            )
+            return result
 
     def select(
         self,
@@ -180,7 +193,13 @@ class MeshtasticSettingsController:
                 channel_name=channel.name,
             )
             repository.save_channel_selection(selection)
+            self._notify_binding(selection if self._gateway.connected else None)
             return self._status(repository, selection=selection)
+
+    def _notify_binding(self, selection: MeshtasticChannelSelection | None) -> None:
+        if self._on_binding is not None:
+            with suppress(Exception):
+                self._on_binding(selection)
 
     def close(self) -> None:
         self._gateway.close()
