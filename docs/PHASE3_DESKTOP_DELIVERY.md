@@ -1,6 +1,6 @@
 # Phase 3 — Desktop, Server, and Appliance Delivery
 
-Status: design requirement, not implemented. SOLoRa has three distribution models: Desktop, Server, and Appliance. These are packaging choices, never system roles. The existing `make run` still starts only the HTTP service. Physical two-radio validation remains an independent, mandatory Phase 2 gate.
+Status: requirements with an implemented Phase 3A PR A runtime/control-window prototype. See [actual implementation and validation](PHASE3A_RUNTIME.md); packaging, login integration and platform acceptance are still pending. SOLoRa has three distribution models: Desktop, Server, and Appliance. These are packaging choices, never system roles. The existing `make run` still starts only the development HTTP service. Physical two-radio validation remains an independent, mandatory Phase 2 gate.
 
 ## User experience
 

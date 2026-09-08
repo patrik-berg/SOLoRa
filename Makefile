@@ -19,6 +19,15 @@ migrate:
 run: build migrate
 	$(UV) run uvicorn solora.app:app --app-dir backend/src --host 127.0.0.1 --port 8000
 
+.PHONY: desktop runtime-server
+desktop:
+	$(PNPM) --dir frontend build
+	$(UV) run solora desktop
+
+runtime-server:
+	$(PNPM) --dir frontend build
+	$(UV) run solora server
+
 demo-two-nodes:
 	$(UV) run python -m solora.demo_two_nodes
 

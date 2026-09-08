@@ -5,6 +5,7 @@ import {
   createThread,
   getMeshtasticSettings,
   getSystemSettings,
+  getRuntimeSettings,
   getThread,
   listThreads,
   refreshMeshtasticChannels,
@@ -16,6 +17,7 @@ import {
   type MeshtasticSettings,
   type SystemRole,
   type SystemSettings,
+  type RuntimeSettings,
   type Thread,
   type ThreadSummary,
 } from './api.ts'
@@ -50,6 +52,7 @@ export default function App() {
   const [view, setView] = useState<'forum' | 'settings'>('forum')
   const [settingsSection, setSettingsSection] = useState<'system' | 'meshtastic'>('system')
   const [system, setSystem] = useState<SystemSettings | null>(null)
+  const [runtime, setRuntime] = useState<RuntimeSettings | null>(null)
   const [systemName, setSystemName] = useState('')
   const [systemRole, setSystemRole] = useState<SystemRole>('CLIENT')
   const [confirmRoleChange, setConfirmRoleChange] = useState(false)
@@ -136,6 +139,7 @@ export default function App() {
   }
 
   async function openSettings(section: 'system' | 'meshtastic' = 'meshtastic') {
+    void getRuntimeSettings().then(setRuntime).catch(() => setRuntime(null))
     setSettingsSection(section)
     setView('settings')
     setError('')
@@ -353,6 +357,9 @@ export default function App() {
                     <div><dt>Connection</dt><dd>{radio?.connected ? connectionLabel(radio.connection?.connection_type) : 'Offline'}</dd></div>
                     <div><dt>Channel</dt><dd>{radio?.selection?.channel_name ?? '–'}</dd></div>
                     <div><dt>App version</dt><dd>{system?.app_version ?? '–'}</dd></div>
+                    <div><dt>Runtime</dt><dd>{runtime?.mode ?? '–'}</dd></div>
+                    {runtime?.active && <div><dt>Aktiv webbserver</dt><dd>{runtime.active.bind}:{runtime.active.port}</dd></div>}
+                    {runtime?.configured && <div><dt>Sparad webbserver</dt><dd>{runtime.configured.bind}:{runtime.configured.port}</dd></div>}
                     <div><dt>Protocol version</dt><dd>{system?.protocol_version ?? '–'}</dd></div>
                     <div><dt>Primary authority</dt><dd>{system?.primary_authority_node_id ? `!${system.primary_authority_node_id.toString(16).padStart(8, '0')}` : '–'}</dd></div>
                   </dl>

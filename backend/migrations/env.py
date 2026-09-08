@@ -20,7 +20,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 configured_url = os.getenv("SOLORA_DATABASE_URL")
-if configured_url:
+if configured_url and not config.attributes.get("runtime_explicit_url"):
     config.set_main_option("sqlalchemy.url", configured_url)
 
 target_metadata = Base.metadata

@@ -21,6 +21,8 @@ Before submitting work, run every configured formatter, linter, test suite, and 
 
 Before declaring a feature, bug fix, or substantial change complete, review every applicable item in `CHECKLIST.md` and resolve any unmet item.
 
+For runtime work, use `make desktop` or `make runtime-server`; these use a separate persistent profile from development `make run`. `uv run solora` provides GUI-free status/configuration/server commands after assets are built. Keep the sole app version in `backend/src/solora/version.py`. Do not import `desktop/` or the development ASGI singleton from headless runtime. See `docs/PHASE3A_RUNTIME.md` for ownership, readiness and offline recovery contracts.
+
 ## Coding Style & Naming Conventions
 
 Target Python 3.12 and Node.js 24. Ruff controls Python formatting with 4-space indentation and a 100-character line limit; Oxlint and TypeScript check the frontend. Use `snake_case` for Python, `PascalCase` for React components and classes, and `camelCase` for TypeScript functions. Keep domain code independent of frameworks and adapters.

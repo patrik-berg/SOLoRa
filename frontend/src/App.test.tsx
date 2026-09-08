@@ -33,12 +33,32 @@ const baseSystem = {
   role_status: 'active',
   meshtastic_node_id: null,
   primary_authority_node_id: null,
-  app_version: '0.1.0',
+  app_version: '0.2.0-beta.1',
   protocol_version: 1,
 }
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+test('shows active and saved runtime config without exposing process controls', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+    const path = String(input)
+    if (path === '/api/threads') return Response.json([])
+    if (path === '/api/settings/meshtastic') return Response.json(baseStatus)
+    if (path === '/api/settings/runtime') return Response.json({
+      mode: 'desktop',
+      active: { bind: '127.0.0.1', port: 8011 },
+      configured: { bind: '127.0.0.1', port: 8012 },
+    })
+    return Response.json(baseSystem)
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'SOL2 · Client' }))
+  expect(await screen.findByText('127.0.0.1:8011')).toBeInTheDocument()
+  expect(screen.getByText('127.0.0.1:8012')).toBeInTheDocument()
+  expect(screen.getByText('desktop')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Restart server/ })).not.toBeInTheDocument()
 })
 
 test('lists and opens a local thread', async () => {
@@ -285,7 +305,7 @@ test('keeps system name and role separate and confirms role changes', async () =
   render(<App />)
 
   fireEvent.click(await screen.findByRole('button', { name: 'SOL2 · Client' }))
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6))
   fireEvent.change(screen.getByLabelText('System name'), {
     target: { value: 'Base North' },
   })

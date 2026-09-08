@@ -82,6 +82,20 @@ Meshtastic channel indices are node-local: two nodes may both use `solora-link` 
 
 ## Release policy
 
+### Implemented Phase 3A runtime boundary
+
+PR A introduces GUI-free `runtime/` modules for OS paths, atomic bootstrap config,
+readiness and process ownership, plus a thin `desktop/window.py` ttk prototype.
+The installed-runtime factory lives in `web/application.py`; the development
+`app.py` entry is separate so headless startup never creates a development database.
+Desktop owns its child through inherited local pipes, while headless is externally
+owned. Both lock the same persistent data profile; neither adopts another service.
+Frontend assets are served by FastAPI, and `/health/ready` verifies DB/schema/state
+and assets independently of radio. Shared configuration is available before HTTP
+and read-only in web diagnostics. Application version comes from `version.py`,
+not the protocol registry. See [the implemented runtime contract](docs/PHASE3A_RUNTIME.md)
+for layout, recovery, test evidence and remaining packaging/platform gates.
+
 ### Desktop and headless installation
 
 Distribution is separate from role: **Desktop** targets Windows/macOS; **Server** installs on existing Linux/Raspberry Pi OS on Pi 4/5, preferably via `.deb`; **Appliance** is a flashable, automatically starting headless image for Pi Zero 2 W. Linux desktop controls are optional; Zero 2 W has no desktop, Tkinter, or development tools. All use identical core, protocol, database, sync, roles, transport, and web UI; packaging and OS/recovery adapters provide the differences.
@@ -94,6 +108,6 @@ Phase 3 must include a small local control window as part of the installed deskt
 
 The supervisor owns the desktop backend child and remains usable when HTTP fails. Local process control must be independent of the configurable HTTP listener. Headless mode instead uses an OS service manager and equivalent status/configuration controls, with no GUI dependency. One owner per data profile prevents duplicate services and radio connections. Name, role, and Node ID retain their independent meanings.
 
-The provisional packaging direction is a Python/Tkinter control shell with platform-specific bundles; toolkit selection must pass desktop accessibility, Hide/restore, startup, and Pi build gates. Loopback remains the default, wildcard bindings display actual usable addresses, and port/interface changes require explicit Apply with restart/recovery handling. See [Phase 3 desktop delivery design](docs/PHASE3_DESKTOP_DELIVERY.md) for requirements, alternatives, and validation gates. This is planned behavior, not a claim about the current launcher.
+The provisional packaging direction is a Python/Tkinter control shell with platform-specific bundles; toolkit selection must pass desktop accessibility, Hide/restore, startup, and platform build gates. Loopback remains the default, wildcard bindings display actual usable addresses, and port/interface changes require explicit Apply with restart/recovery handling. The source-run prototype now implements these controls; installers and login integration remain PR B work. See [Phase 3 desktop delivery design](docs/PHASE3_DESKTOP_DELIVERY.md) for requirements, alternatives, and validation gates.
 
 GitHub Actions will eventually build immutable `v0.x.x-beta.N` artifacts. Stable promotion always requires explicit manual approval.
