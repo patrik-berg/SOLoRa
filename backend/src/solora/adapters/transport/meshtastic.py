@@ -13,6 +13,7 @@ from solora.application.transport_ports import (
     TrafficPriority,
     TransportError,
 )
+from solora.domain.meshtastic_settings import MeshtasticChannel, MeshtasticNodeChannels
 from solora.domain.protocol import MESHTASTIC_DATA_PAYLOAD_MAX
 
 PRIVATE_APP_TOPIC = "meshtastic.receive.data.PRIVATE_APP"
@@ -52,6 +53,29 @@ class _MeshtasticRuntime:
     payload_limit: int
     background_priority: int
     reliable_priority: int
+    disabled_channel_role: int
+
+
+class SerialMeshtasticChannelDiscovery:
+    """Explicitly inspect enabled channels on one serial-connected node."""
+
+    def __init__(self, device: str | None = None) -> None:
+        self.device = device
+
+    def discover(self) -> MeshtasticNodeChannels:
+        runtime = _load_runtime()
+        try:
+            interface = runtime.serial_factory(self.device)
+        except Exception as error:
+            raise TransportError(f"Could not open Meshtastic serial device: {error}") from error
+        try:
+            return MeshtasticNodeChannels(
+                node_id=_read_node_id(interface),
+                connection_type="serial",
+                channels=_read_channels(interface, runtime.disabled_channel_role),
+            )
+        finally:
+            interface.close()
 
 
 class MeshtasticTransport:
@@ -67,6 +91,7 @@ class MeshtasticTransport:
         background_priority: int,
         reliable_priority: int,
         channel_index: int = 0,
+        channel_name: str | None = None,
         hop_limit: int | None = None,
     ) -> None:
         if payload_limit <= 0:
@@ -83,6 +108,7 @@ class MeshtasticTransport:
         self._background_priority = background_priority
         self._reliable_priority = reliable_priority
         self._channel_index = channel_index
+        self._channel_name = channel_name
         self._hop_limit = hop_limit
         self._receiver: FrameReceiver | None = None
         self._closed = False
@@ -96,6 +122,7 @@ class MeshtasticTransport:
         device: str | None = None,
         *,
         channel_index: int = 0,
+        channel_name: str | None = None,
         hop_limit: int | None = None,
     ) -> MeshtasticTransport:
         """Open an official Meshtastic ``SerialInterface``."""
@@ -105,6 +132,12 @@ class MeshtasticTransport:
         except Exception as error:
             raise TransportError(f"Could not open Meshtastic serial device: {error}") from error
         try:
+            _validate_channel(
+                interface,
+                channel_index=channel_index,
+                channel_name=channel_name,
+                disabled_role=runtime.disabled_channel_role,
+            )
             return cls(
                 interface,
                 runtime.publisher,
@@ -113,6 +146,7 @@ class MeshtasticTransport:
                 background_priority=runtime.background_priority,
                 reliable_priority=runtime.reliable_priority,
                 channel_index=channel_index,
+                channel_name=channel_name,
                 hop_limit=hop_limit,
             )
         except Exception:
@@ -127,6 +161,14 @@ class MeshtasticTransport:
     def last_packet_id(self) -> int | None:
         """Most recent Meshtastic packet ID accepted by the local SDK."""
         return self._last_packet_id
+
+    @property
+    def channel_index(self) -> int:
+        return self._channel_index
+
+    @property
+    def channel_name(self) -> str | None:
+        return self._channel_name
 
     def set_receiver(self, receiver: FrameReceiver) -> None:
         self._receiver = receiver
@@ -194,6 +236,7 @@ class MeshtasticTransport:
             packet,
             private_app=self._private_app,
             payload_limit=self._payload_limit,
+            channel_index=self._channel_index,
         )
         if frame is not None and self._receiver is not None:
             self._receiver(frame)
@@ -204,6 +247,7 @@ def _decode_inbound(
     *,
     private_app: int,
     payload_limit: int,
+    channel_index: int,
 ) -> InboundFrame | None:
     if not isinstance(packet, Mapping):
         return None
@@ -212,6 +256,9 @@ def _decode_inbound(
         return None
     portnum = decoded.get("portnum")
     if portnum not in (private_app, "PRIVATE_APP"):
+        return None
+    packet_channel = packet.get("channel", 0)
+    if not _is_channel_index(packet_channel) or packet_channel != channel_index:
         return None
 
     source = packet.get("from")
@@ -241,6 +288,53 @@ def _read_node_id(interface: _MeshtasticInterface) -> int:
     return node_id
 
 
+def _read_channels(
+    interface: _MeshtasticInterface,
+    disabled_role: int,
+) -> tuple[MeshtasticChannel, ...]:
+    local_node = getattr(interface, "localNode", None)
+    channels = getattr(local_node, "channels", None)
+    if not isinstance(channels, (list, tuple)):
+        raise TransportError("Meshtastic interface did not provide channel configuration")
+
+    discovered: list[MeshtasticChannel] = []
+    role_names = {0: "disabled", 1: "primary", 2: "secondary"}
+    for channel in channels:
+        index = getattr(channel, "index", None)
+        role = getattr(channel, "role", None)
+        settings = getattr(channel, "settings", None)
+        name = getattr(settings, "name", None)
+        if not _is_channel_index(index) or not isinstance(role, int) or isinstance(role, bool):
+            continue
+        if role == disabled_role:
+            continue
+        if not isinstance(name, str):
+            continue
+        discovered.append(MeshtasticChannel(index, name, role_names.get(role, f"role-{role}")))
+    return tuple(sorted(discovered, key=lambda channel: channel.index))
+
+
+def _validate_channel(
+    interface: _MeshtasticInterface,
+    *,
+    channel_index: int,
+    channel_name: str | None,
+    disabled_role: int,
+) -> None:
+    channels = _read_channels(interface, disabled_role)
+    selected = next((channel for channel in channels if channel.index == channel_index), None)
+    if selected is None:
+        raise TransportError(f"Meshtastic channel index {channel_index} is not enabled")
+    if channel_name is not None and selected.name != channel_name:
+        raise TransportError(
+            "Meshtastic channel name/index no longer match; refresh and confirm the selection"
+        )
+
+
+def _is_channel_index(value: object) -> TypeGuard[int]:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 7
+
+
 def _queue_is_full(interface: _MeshtasticInterface) -> bool:
     queue_status = getattr(interface, "queueStatus", None)
     free = getattr(queue_status, "free", None)
@@ -250,6 +344,7 @@ def _queue_is_full(interface: _MeshtasticInterface) -> bool:
 def _load_runtime() -> _MeshtasticRuntime:
     try:
         serial_module = import_module("meshtastic.serial_interface")
+        channel_module = import_module("meshtastic.protobuf.channel_pb2")
         mesh_module = import_module("meshtastic.protobuf.mesh_pb2")
         portnums_module = import_module("meshtastic.protobuf.portnums_pb2")
         publisher = import_module("pubsub").pub
@@ -269,4 +364,5 @@ def _load_runtime() -> _MeshtasticRuntime:
         payload_limit=int(constants.DATA_PAYLOAD_LEN),
         background_priority=int(priorities.BACKGROUND),
         reliable_priority=int(priorities.RELIABLE),
+        disabled_channel_role=int(channel_module.Channel.Role.DISABLED),
     )

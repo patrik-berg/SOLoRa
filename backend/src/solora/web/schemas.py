@@ -30,3 +30,33 @@ class PostResponse(BaseModel):
 
 class ThreadResponse(ThreadSummaryResponse):
     posts: list[PostResponse]
+
+
+class MeshtasticChannelResponse(BaseModel):
+    index: int
+    name: str
+    display_name: str
+    role: str
+    recommended: bool
+
+
+class MeshtasticChannelSelectionResponse(BaseModel):
+    node_id: int
+    channel_index: int
+    channel_name: str
+
+
+class MeshtasticSettingsResponse(BaseModel):
+    connected: bool
+    node_id: int | None
+    connection_type: str | None
+    channels: list[MeshtasticChannelResponse]
+    selection: MeshtasticChannelSelectionResponse | None
+    selection_valid: bool
+    recommended_channel_index: int | None
+    error: str | None
+
+
+class SelectMeshtasticChannelRequest(BaseModel):
+    channel_index: int = Field(ge=0, le=7)
+    channel_name: str = Field(max_length=12)

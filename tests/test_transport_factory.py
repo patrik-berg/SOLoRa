@@ -18,6 +18,7 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOLORA_TRANSPORT", "meshtastic-serial")
     monkeypatch.setenv("SOLORA_MESHTASTIC_DEVICE", "/dev/tty.usbmodem-test")
     monkeypatch.setenv("SOLORA_MESHTASTIC_CHANNEL", "2")
+    monkeypatch.setenv("SOLORA_MESHTASTIC_CHANNEL_NAME", "solora-link")
     monkeypatch.setenv("SOLORA_MESHTASTIC_HOP_LIMIT", "3")
 
     settings = TransportSettings.from_environment()
@@ -26,6 +27,7 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         kind=TransportKind.MESHTASTIC_SERIAL,
         serial_device="/dev/tty.usbmodem-test",
         channel_index=2,
+        channel_name="solora-link",
         hop_limit=3,
     )
 
@@ -38,16 +40,17 @@ def test_factory_creates_in_memory_transport() -> None:
 
 
 def test_factory_delegates_serial_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[str | None, int, int | None]] = []
+    calls: list[tuple[str | None, int, str | None, int | None]] = []
     marker = cast(InMemoryTransport, create_transport(TransportSettings(), node_id=1))
 
     def open_serial(
         device: str | None,
         *,
         channel_index: int,
+        channel_name: str | None,
         hop_limit: int | None,
     ) -> InMemoryTransport:
-        calls.append((device, channel_index, hop_limit))
+        calls.append((device, channel_index, channel_name, hop_limit))
         return marker
 
     monkeypatch.setattr(factory.MeshtasticTransport, "open_serial", open_serial)
@@ -56,12 +59,13 @@ def test_factory_delegates_serial_settings(monkeypatch: pytest.MonkeyPatch) -> N
             kind=TransportKind.MESHTASTIC_SERIAL,
             serial_device="/dev/test",
             channel_index=4,
+            channel_name="solora-link",
             hop_limit=5,
         )
     )
 
     assert result is marker
-    assert calls == [("/dev/test", 4, 5)]
+    assert calls == [("/dev/test", 4, "solora-link", 5)]
 
 
 def test_cli_selects_in_memory(capsys: pytest.CaptureFixture[str]) -> None:

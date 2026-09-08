@@ -50,10 +50,15 @@ Install the optional official Meshtastic SDK before opening a USB radio:
 
 ```sh
 make setup-radio
-SOLORA_MESHTASTIC_DEVICE=/dev/cu.usbmodem0001 make transport-radio
+SOLORA_MESHTASTIC_DEVICE=/dev/cu.usbmodem0001 \
+SOLORA_MESHTASTIC_CHANNEL=3 \
+SOLORA_MESHTASTIC_CHANNEL_NAME=solora-link \
+make transport-radio
 ```
 
-Programmatic construction uses `TransportSettings.from_environment()` and `create_transport()`. Supported values for `SOLORA_TRANSPORT` are `in-memory` and `meshtastic-serial`; serial settings also accept `SOLORA_MESHTASTIC_DEVICE`, `SOLORA_MESHTASTIC_CHANNEL`, and `SOLORA_MESHTASTIC_HOP_LIMIT`.
+Open **Systeminställningar → Meshtastic-kanal** in the web UI, connect a serial node, and click **Uppdatera kanaler från noden**. Select an enabled channel and confirm it. `solora-link` is recommended when present, but never created or selected automatically. The saved binding includes node ID, channel name, and that node's local channel index; a change requires explicit reconfirmation. SOLoRa does not read, expose, or persist the channel PSK.
+
+Programmatic construction uses `TransportSettings.from_environment()` and `create_transport()`. Supported values for `SOLORA_TRANSPORT` are `in-memory` and `meshtastic-serial`; serial settings also accept `SOLORA_MESHTASTIC_DEVICE`, `SOLORA_MESHTASTIC_CHANNEL`, `SOLORA_MESHTASTIC_CHANNEL_NAME`, and `SOLORA_MESHTASTIC_HOP_LIMIT`. The CLI only verifies transport construction; it does not start forum synchronization.
 
 See [the two-radio hardware procedure](docs/MESHTASTIC_HARDWARE_TEST.md) before connecting physical nodes.
 

@@ -75,3 +75,14 @@ class RepairRequestRecord(Base):
     object_kind: Mapped[int] = mapped_column(Integer, primary_key=True)
     object_id: Mapped[bytes] = mapped_column(LargeBinary(12), primary_key=True)
     requested_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class MeshtasticSettingsRecord(Base):
+    """Singleton containing the user-confirmed local radio channel."""
+
+    __tablename__ = "meshtastic_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    selected_node_id: Mapped[int] = mapped_column(Integer)
+    selected_channel_index: Mapped[int] = mapped_column(Integer)
+    selected_channel_name: Mapped[str] = mapped_column(String(12))

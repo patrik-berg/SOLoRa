@@ -115,3 +115,60 @@ test('shows an error when the API is unavailable', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Det gick inte att läsa trådarna.')
 })
+
+test('refreshes and confirms a Meshtastic channel only from settings', async () => {
+  const requests: Array<{ path: string; method: string }> = []
+  const baseStatus = {
+    connected: false,
+    node_id: null,
+    connection_type: null,
+    channels: [],
+    selection: null,
+    selection_valid: false,
+    recommended_channel_index: null,
+    error: null,
+  }
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = String(input)
+    const method = init?.method ?? 'GET'
+    requests.push({ path, method })
+    if (path === '/api/threads') return Response.json([])
+    if (path.endsWith('/refresh')) {
+      return Response.json({
+        ...baseStatus,
+        connected: true,
+        node_id: 161,
+        connection_type: 'serial',
+        channels: [{ index: 3, name: 'solora-link', display_name: 'solora-link', role: 'secondary', recommended: true }],
+        recommended_channel_index: 3,
+        error: 'Choose and confirm a SOLoRa channel',
+      })
+    }
+    if (path.endsWith('/channel')) {
+      return Response.json({
+        ...baseStatus,
+        connected: true,
+        node_id: 161,
+        connection_type: 'serial',
+        selection: { node_id: 161, channel_index: 3, channel_name: 'solora-link' },
+        selection_valid: true,
+      })
+    }
+    return Response.json(baseStatus)
+  }))
+
+  render(<App />)
+  await screen.findByText('Inga trådar ännu. Skapa den första.')
+  expect(requests).toEqual([{ path: '/api/threads', method: 'GET' }])
+
+  fireEvent.click(screen.getByRole('button', { name: 'Systeminställningar' }))
+  await screen.findByRole('heading', { name: 'Meshtastic-kanal' })
+  fireEvent.click(screen.getByRole('button', { name: 'Uppdatera kanaler från noden' }))
+  const select = await screen.findByLabelText('SOLoRa-kanal på denna nod')
+  expect(select).toHaveValue('3:solora-link')
+  fireEvent.click(screen.getByRole('button', { name: 'Bekräfta kanal' }))
+
+  await waitFor(() => expect(screen.getByText('Bekräftat')).toBeInTheDocument())
+  expect(requests).toContainEqual({ path: '/api/settings/meshtastic/refresh', method: 'POST' })
+  expect(requests).toContainEqual({ path: '/api/settings/meshtastic/channel', method: 'PUT' })
+})

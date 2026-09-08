@@ -27,6 +27,8 @@
 - [x] Simulate loss, resend, duplicate delivery, acknowledgement, and restart with two virtual nodes.
 - [x] Add a thin USB/serial adapter using the official Meshtastic Python SDK and `PRIVATE_APP`.
 - [x] Cover serial mapping, routing-ACK isolation, queue errors, and selection with hardware-free mocks.
+- [x] Discover enabled node channels and persist an exact, user-confirmed node/name/index binding.
+- [x] Restrict `PRIVATE_APP` transmit and receive to the selected local channel without exposing PSKs.
 - [x] Add explicit `SYNC` inventories, batched `WANT`, missing-thread repair, and idempotent object transfer.
 - [x] Prove offline → reconnect → packet loss → bidirectional convergence with virtual nodes.
 - [ ] **Required Phase 2 validation gate:** execute the documented end-to-end procedure with two physical Meshtastic nodes.
