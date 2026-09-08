@@ -90,6 +90,14 @@ header {
   font-size: 0.8rem;
 }
 
+.identity-pill {
+  border-color: #30495b;
+  background: transparent;
+  box-shadow: none;
+  color: #dce9f6;
+  font-size: 0.8rem;
+}
+
 .connection-pill.online {
   border-color: rgb(58 218 151 / 38%);
   color: #55e6a4;
@@ -264,6 +272,79 @@ select:focus {
   border-radius: 0.55rem;
   background: #0d2230;
   padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+.settings-tabs {
+  display: flex;
+  margin: 1rem 0 1.5rem;
+  border-bottom: 1px solid #263d4e;
+  gap: 0.35rem;
+}
+
+.settings-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #91abc1;
+}
+
+.settings-tabs button.active {
+  border-bottom-color: #348bf2;
+  color: #edf6ff;
+}
+
+.system-settings,
+.meshtastic-settings {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.system-settings > label {
+  margin: 0.35rem 0 -0.35rem;
+}
+
+.role-warning {
+  display: grid;
+  border: 1px solid rgb(242 184 75 / 44%);
+  border-radius: 0.4rem;
+  background: rgb(242 184 75 / 9%);
+  color: #ffd98c;
+  gap: 0.65rem;
+  padding: 0.8rem;
+}
+
+.role-warning label {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  color: #ffe3aa;
+  gap: 0.55rem;
+}
+
+.role-warning input {
+  width: auto;
+  accent-color: #348bf2;
+}
+
+.diagnostics {
+  margin-top: 1rem;
+  border-top: 1px solid #263d4e;
+  padding-top: 1rem;
+}
+
+.diagnostics h3 {
+  margin: 0 0 0.8rem;
+}
+
+.identity-note {
+  border-left: 3px solid #348bf2;
+  background: rgb(52 139 242 / 8%);
+  color: #a9bfd3;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding: 0.75rem;
 }
 
 .settings-intro {

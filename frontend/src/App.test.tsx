@@ -27,6 +27,16 @@ const baseStatus = {
   error: null,
 }
 
+const baseSystem = {
+  system_name: 'SOL2',
+  system_role: 'CLIENT',
+  role_status: 'active',
+  meshtastic_node_id: null,
+  primary_authority_node_id: null,
+  app_version: '0.1.0',
+  protocol_version: 1,
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -38,7 +48,9 @@ test('lists and opens a local thread', async () => {
       ? [thread]
       : path === '/api/settings/meshtastic'
         ? baseStatus
-        : { ...thread, posts: [] }
+        : path === '/api/settings/system'
+          ? baseSystem
+          : { ...thread, posts: [] }
     return new Response(JSON.stringify(body), {
       headers: { 'Content-Type': 'application/json' },
     })
@@ -63,6 +75,7 @@ test('shows loading and empty states', async () => {
   let resolveThreads: ((response: Response) => void) | undefined
   vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
     if (String(input) === '/api/settings/meshtastic') return Promise.resolve(Response.json(baseStatus))
+    if (String(input) === '/api/settings/system') return Promise.resolve(Response.json(baseSystem))
     return new Promise<Response>((resolve) => { resolveThreads = resolve })
   }))
 
@@ -105,6 +118,7 @@ test('creates a thread and a post', async () => {
       })
     }
     if (path === '/api/settings/meshtastic') return Response.json(baseStatus)
+    if (path === '/api/settings/system') return Response.json(baseSystem)
     return Response.json(requests.some((request) => request.method === 'POST') ? [] : [])
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -135,11 +149,12 @@ test('shows an error when the API is unavailable', async () => {
 
 test('refreshes and confirms a Meshtastic channel only from settings', async () => {
   const requests: Array<{ path: string; method: string }> = []
-  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+  const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
     const method = init?.method ?? 'GET'
     requests.push({ path, method })
     if (path === '/api/threads') return Response.json([])
+    if (path === '/api/settings/system') return Response.json(baseSystem)
     if (path.endsWith('/devices/refresh')) {
       return Response.json({
         ...baseStatus,
@@ -174,15 +189,17 @@ test('refreshes and confirms a Meshtastic channel only from settings', async () 
       })
     }
     return Response.json(baseStatus)
-  }))
+  })
+  vi.stubGlobal('fetch', fetchMock)
 
   render(<App />)
   await screen.findByText('Inga trådar ännu. Skapa den första.')
   expect(requests).toContainEqual({ path: '/api/threads', method: 'GET' })
   expect(requests).toContainEqual({ path: '/api/settings/meshtastic', method: 'GET' })
-  expect(requests).toHaveLength(2)
+  expect(requests).toContainEqual({ path: '/api/settings/system', method: 'GET' })
+  expect(requests).toHaveLength(3)
 
-  fireEvent.click(screen.getByRole('button', { name: 'Offline' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Meshtastic offline' }))
   await screen.findByRole('heading', { name: 'Meshtastic' })
   fireEvent.click(screen.getByRole('button', { name: 'Uppdatera enhetslista' }))
   const device = await screen.findByLabelText('Upptäckt enhet')
@@ -205,6 +222,7 @@ test('accepts a network hostname without terminal configuration', async () => {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
     if (path === '/api/threads') return Response.json([])
+    if (path === '/api/settings/system') return Response.json(baseSystem)
     if (path.endsWith('/test')) {
       submittedBody = String(init?.body)
       return Response.json({
@@ -220,7 +238,7 @@ test('accepts a network hostname without terminal configuration', async () => {
   }))
 
   render(<App />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Offline' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Meshtastic offline' }))
   fireEvent.click(screen.getByLabelText('Network'))
   fireEvent.change(screen.getByLabelText('Hostname eller IP-adress'), {
     target: { value: 'mesh.local' },
@@ -232,4 +250,62 @@ test('accepts a network hostname without terminal configuration', async () => {
     connection_type: 'network',
     endpoint: 'mesh.local',
   })
+})
+
+test('keeps system name and role separate and confirms role changes', async () => {
+  let submittedBody = ''
+  const promotedSystem = {
+    ...baseSystem,
+    system_name: 'Base North',
+    system_role: 'PRIMARY',
+    role_status: 'experimental',
+    meshtastic_node_id: 0x91ab22cd,
+    primary_authority_node_id: 0x91ab22cd,
+  }
+  const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = String(input)
+    if (path === '/api/threads') return Response.json([])
+    if (path === '/api/settings/meshtastic') {
+      return Response.json({
+        ...baseStatus,
+        connected: true,
+        node_id: 0x91ab22cd,
+        connection: { connection_type: 'network', endpoint: 'base-north.local' },
+        selection: { node_id: 0x91ab22cd, channel_index: 4, channel_name: 'solora-link' },
+      })
+    }
+    if (path === '/api/settings/system' && init?.method === 'PUT') {
+      submittedBody = String(init.body)
+      return Response.json(promotedSystem)
+    }
+    return Response.json(baseSystem)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  render(<App />)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'SOL2 · Client' }))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
+  fireEvent.change(screen.getByLabelText('System name'), {
+    target: { value: 'Base North' },
+  })
+  fireEvent.change(screen.getByLabelText('System role'), {
+    target: { value: 'PRIMARY' },
+  })
+
+  const save = screen.getByRole('button', { name: 'Spara systeminställningar' })
+  expect(save).toBeDisabled()
+  expect(screen.getByText(/Rollbyte påverkar framtida authority/)).toBeInTheDocument()
+  fireEvent.click(screen.getByLabelText('Jag bekräftar det uttryckliga rollbytet.'))
+  expect(save).toBeEnabled()
+  fireEvent.click(save)
+
+  await waitFor(() => expect(submittedBody).not.toBe(''))
+  expect(await screen.findByRole('button', { name: 'Base North · Primary server' })).toBeInTheDocument()
+  expect(JSON.parse(submittedBody)).toEqual({
+    system_name: 'Base North',
+    system_role: 'PRIMARY',
+    confirm_role_change: true,
+  })
+  expect(screen.getAllByText('!91ab22cd')).toHaveLength(2)
 })

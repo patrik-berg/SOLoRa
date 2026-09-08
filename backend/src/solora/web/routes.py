@@ -9,14 +9,25 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from solora.adapters.persistence.database import Database
 from solora.adapters.persistence.repository import SqlAlchemyForumRepository
 from solora.adapters.persistence.settings_repository import SqlAlchemyChannelSettingsRepository
+from solora.adapters.persistence.system_settings_repository import (
+    SqlAlchemySystemSettingsRepository,
+)
 from solora.application.forum import ForumService, ForumValidationError, ThreadNotFoundError
 from solora.application.meshtastic_settings import (
     ChannelSelectionError,
     MeshtasticSettingsController,
     MeshtasticSettingsStatus,
 )
+from solora.application.system_settings import (
+    RoleChangeConfirmationRequiredError,
+    SystemSettingsService,
+    SystemSettingsValidationError,
+)
+from solora.config import APP_VERSION
 from solora.domain.meshtastic_settings import RECOMMENDED_CHANNEL_NAME, MeshtasticConnectionConfig
 from solora.domain.models import Post, Thread
+from solora.domain.protocol import PROTOCOL_VERSION
+from solora.domain.system_settings import SystemIdentity, SystemRole, primary_authority_identity
 from solora.web.schemas import (
     CreatePostRequest,
     CreateThreadRequest,
@@ -27,9 +38,11 @@ from solora.web.schemas import (
     MeshtasticSettingsResponse,
     PostResponse,
     SelectMeshtasticChannelRequest,
+    SystemSettingsResponse,
     TestMeshtasticConnectionRequest,
     ThreadResponse,
     ThreadSummaryResponse,
+    UpdateSystemSettingsRequest,
 )
 
 router = APIRouter(prefix="/api")
@@ -52,6 +65,17 @@ def _channel_repository(request: Request) -> Iterator[SqlAlchemyChannelSettingsR
 
 ChannelRepositoryDependency = Annotated[
     SqlAlchemyChannelSettingsRepository, Depends(_channel_repository)
+]
+
+
+def _system_repository(request: Request) -> Iterator[SqlAlchemySystemSettingsRepository]:
+    database: Database = request.app.state.database
+    with database.sessions() as session:
+        yield SqlAlchemySystemSettingsRepository(session)
+
+
+SystemRepositoryDependency = Annotated[
+    SqlAlchemySystemSettingsRepository, Depends(_system_repository)
 ]
 
 
@@ -115,6 +139,52 @@ def _settings(status_value: MeshtasticSettingsStatus) -> MeshtasticSettingsRespo
         last_contact=last_contact,
         error=status_value.error,
     )
+
+
+def _system_settings(
+    identity: SystemIdentity,
+    node_id: int | None,
+) -> SystemSettingsResponse:
+    authority = primary_authority_identity(identity, node_id)
+    return SystemSettingsResponse(
+        system_name=identity.system_name,
+        system_role=identity.system_role,
+        role_status="active" if identity.system_role is SystemRole.CLIENT else "experimental",
+        meshtastic_node_id=node_id,
+        primary_authority_node_id=authority.node_id if authority is not None else None,
+        app_version=APP_VERSION,
+        protocol_version=PROTOCOL_VERSION,
+    )
+
+
+@router.get("/settings/system", response_model=SystemSettingsResponse)
+def get_system_settings(
+    system_repository: SystemRepositoryDependency,
+    channel_repository: ChannelRepositoryDependency,
+) -> SystemSettingsResponse:
+    identity = SystemSettingsService(system_repository).get_identity()
+    connection = channel_repository.get_connection()
+    return _system_settings(identity, connection.node_id if connection else None)
+
+
+@router.put("/settings/system", response_model=SystemSettingsResponse)
+def update_system_settings(
+    request: UpdateSystemSettingsRequest,
+    system_repository: SystemRepositoryDependency,
+    channel_repository: ChannelRepositoryDependency,
+) -> SystemSettingsResponse:
+    try:
+        identity = SystemSettingsService(system_repository).update_identity(
+            system_name=request.system_name,
+            system_role=request.system_role,
+            confirm_role_change=request.confirm_role_change,
+        )
+    except RoleChangeConfirmationRequiredError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+    except SystemSettingsValidationError as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+    connection = channel_repository.get_connection()
+    return _system_settings(identity, connection.node_id if connection else None)
 
 
 @router.get("/settings/meshtastic", response_model=MeshtasticSettingsResponse)

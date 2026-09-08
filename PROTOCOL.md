@@ -88,4 +88,10 @@ The serial adapter sends the v1 frame unchanged as `Data.payload`. It uses the S
 
 USB, direct serial, and TCP/network are interchangeable local client connections below the same `Transport` boundary; they do not alter the v1 envelope, message registry, destination semantics, priorities, or channel filtering. Local SDK connectivity must be reported separately from mesh reachability. Device-list refresh and connection metadata reads do not authorize SOLoRa application frames, discovery beacons, or heartbeat traffic.
 
+## Authority identity (planned)
+
+System display names have no wire authority. In particular, `SOL1` is not a reserved name and must never imply Primary behavior. A future authoritative server is declared by `system_role = PRIMARY` and identified externally by its Meshtastic Node ID. `system_name` may accompany status only as optional display metadata.
+
+A future `STATUS` or `STATUS_BEACON` design may carry role, Node ID, optional system name, protocol version, forum revision, and a server epoch/authority generation for failover. Its precise encoding, trust rules, and conflict handling remain unimplemented. This section allocates no new message ID and changes no v1 wire format. Any future discovery stays low-frequency or piggybacked so **Normal state is silent** remains true.
+
 Secondary implementation references were TC2-BBS-mesh (`295fb35`), Supply Drop BBS (`4b008ae`), and MeshMonitor (`17c412b`). Supply Drop reinforced separating the application core from transports. TC2 demonstrated persisted IDs, SQLite, and serial/TCP operation, but SOLoRa chose compact binary frames and a durable scheduled outbox instead of delimiter text, fixed character chunks, or sleeps. MeshMonitor demonstrated official protobuf/PortNum dispatch; its node/status patterns remain for later work. No reference code or architecture was copied.

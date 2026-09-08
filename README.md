@@ -64,6 +64,12 @@ make transport-radio
 
 The saved configuration includes connection type, endpoint, last known public node metadata, node ID, channel name, and that node's local channel index. A missing node or changed channel requires explicit reconfirmation. SOLoRa does not read, expose, or persist the channel PSK.
 
+## Configure system identity
+
+Open **Systeminställningar → System** to set the local display name and explicit role. `Client` is active; `Primary server` and `Backup server` are stored for test environments but remain experimental until their runtime behavior is implemented. Changing role requires a visible confirmation. The same page shows browser-accessible diagnostics for system identity, Meshtastic connection, selected channel, and app/protocol versions.
+
+System name, system role, and Meshtastic Node ID are deliberately separate. `SOL1` is only a common display name and has no special behavior. A Primary is defined by `system_role = PRIMARY` and identified to other nodes by its Meshtastic Node ID, not its name.
+
 Programmatic construction uses `TransportSettings.from_environment()` and `create_transport()`. Supported values for `SOLORA_TRANSPORT` are `in-memory`, `meshtastic-serial`, and `meshtastic-network`. The CLI only verifies transport construction; it does not start forum synchronization.
 
 See [the two-radio hardware procedure](docs/MESHTASTIC_HARDWARE_TEST.md) before connecting physical nodes.

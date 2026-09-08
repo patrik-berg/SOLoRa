@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from solora.adapters.persistence.database import Database
 from solora.adapters.transport.meshtastic import MeshtasticConnectionGateway
 from solora.application.meshtastic_settings import MeshtasticGateway, MeshtasticSettingsController
-from solora.config import DEFAULT_FRONTEND_PATH
+from solora.config import APP_VERSION, DEFAULT_FRONTEND_PATH
 from solora.config import database_url as default_database_url
 from solora.web.routes import router
 
@@ -35,7 +35,7 @@ def create_app(
         settings_controller.close()
         database.close()
 
-    application = FastAPI(title="SOLoRa", version="0.1.0", lifespan=lifespan)
+    application = FastAPI(title="SOLoRa", version=APP_VERSION, lifespan=lifespan)
     application.state.database = database
     application.state.meshtastic_settings = settings_controller
     application.add_middleware(

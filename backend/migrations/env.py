@@ -11,6 +11,7 @@ from solora.adapters.persistence.records import (  # noqa: F401
     MeshtasticConnectionRecord,
     MeshtasticSettingsRecord,
     PostRecord,
+    SystemSettingsRecord,
     ThreadRecord,
 )
 

@@ -4,14 +4,18 @@ import {
   createPost,
   createThread,
   getMeshtasticSettings,
+  getSystemSettings,
   getThread,
   listThreads,
   refreshMeshtasticChannels,
   refreshMeshtasticDevices,
   selectMeshtasticChannel,
   testMeshtasticConnection,
+  updateSystemSettings,
   type MeshtasticConnectionType,
   type MeshtasticSettings,
+  type SystemRole,
+  type SystemSettings,
   type Thread,
   type ThreadSummary,
 } from './api.ts'
@@ -30,6 +34,12 @@ function connectionLabel(value: MeshtasticConnectionType | null | undefined) {
   return '–'
 }
 
+function roleLabel(value: SystemRole | null | undefined) {
+  if (value === 'PRIMARY') return 'Primary server'
+  if (value === 'BACKUP') return 'Backup server'
+  return 'Client'
+}
+
 export default function App() {
   const [threads, setThreads] = useState<ThreadSummary[]>([])
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
@@ -38,6 +48,12 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [view, setView] = useState<'forum' | 'settings'>('forum')
+  const [settingsSection, setSettingsSection] = useState<'system' | 'meshtastic'>('system')
+  const [system, setSystem] = useState<SystemSettings | null>(null)
+  const [systemName, setSystemName] = useState('')
+  const [systemRole, setSystemRole] = useState<SystemRole>('CLIENT')
+  const [confirmRoleChange, setConfirmRoleChange] = useState(false)
+  const [systemLoading, setSystemLoading] = useState(false)
   const [radio, setRadio] = useState<MeshtasticSettings | null>(null)
   const [radioLoading, setRadioLoading] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState('')
@@ -60,6 +76,13 @@ export default function App() {
     }
   }
 
+  function applySystemSettings(settings: SystemSettings) {
+    setSystem(settings)
+    setSystemName(settings.system_name)
+    setSystemRole(settings.system_role)
+    setConfirmRoleChange(false)
+  }
+
   async function openThread(threadId: number) {
     setError('')
     try {
@@ -75,6 +98,7 @@ export default function App() {
       .catch(() => setError('Det gick inte att läsa trådarna.'))
       .finally(() => setLoading(false))
     void getMeshtasticSettings().then(applyRadioStatus).catch(() => undefined)
+    void getSystemSettings().then(applySystemSettings).catch(() => undefined)
   }, [])
 
   async function handleCreateThread(event: FormEvent<HTMLFormElement>) {
@@ -111,16 +135,37 @@ export default function App() {
     if (threadId !== undefined) threadButtons.current.get(threadId)?.focus()
   }
 
-  async function openSettings() {
+  async function openSettings(section: 'system' | 'meshtastic' = 'meshtastic') {
+    setSettingsSection(section)
     setView('settings')
     setError('')
     setRadioLoading(true)
     try {
-      applyRadioStatus(await getMeshtasticSettings())
+      const [radioStatus, systemStatus] = await Promise.all([
+        getMeshtasticSettings(),
+        getSystemSettings(),
+      ])
+      applyRadioStatus(radioStatus)
+      applySystemSettings(systemStatus)
     } catch {
       setError('Det gick inte att läsa radioinställningarna.')
     } finally {
       setRadioLoading(false)
+    }
+  }
+
+  async function saveSystemSettings() {
+    if (!systemName.trim()) return
+    setError('')
+    setSystemLoading(true)
+    try {
+      applySystemSettings(
+        await updateSystemSettings(systemName, systemRole, confirmRoleChange),
+      )
+    } catch {
+      setError('Systeminställningarna kunde inte sparas. Bekräfta rollbytet och försök igen.')
+    } finally {
+      setSystemLoading(false)
     }
   }
 
@@ -195,14 +240,21 @@ export default function App() {
         </div>
         <div className="header-actions">
           <button
+            className="identity-pill"
+            onClick={() => void openSettings('system')}
+            type="button"
+          >
+            {system?.system_name ?? 'SOLoRa Node'} · {roleLabel(system?.system_role)}
+          </button>
+          <button
             className={radio?.connected ? 'connection-pill online' : 'connection-pill offline'}
-            onClick={() => void openSettings()}
+            onClick={() => void openSettings('meshtastic')}
             type="button"
           >
             <span aria-hidden="true">●</span>{' '}
             {radio?.connected
-              ? `${radio.node_name ?? `0x${radio.node_id?.toString(16)}`} via ${connectionLabel(radio.connection?.connection_type)}`
-              : 'Offline'}
+              ? `Meshtastic online via ${connectionLabel(radio.connection?.connection_type)}`
+              : 'Meshtastic offline'}
           </button>
           <span className="local-badge">Sparas lokalt</span>
         </div>
@@ -212,15 +264,111 @@ export default function App() {
 
       {view === 'settings' ? (
         <main className="settings-main">
-          <section className="settings-card" aria-busy={radioLoading}>
+          <section className="settings-card" aria-busy={radioLoading || systemLoading}>
             <button className="back-button" onClick={() => setView('forum')} type="button">
               <span aria-hidden="true">←</span> Till forumet
             </button>
             <p className="eyebrow">Systeminställningar</p>
-            <h2>Meshtastic</h2>
-            <p className="settings-intro">
-              Välj hur denna dator ansluter till Meshtastic-noden. Ingen terminal eller manuell config behövs.
-            </p>
+            <nav className="settings-tabs" aria-label="Inställningssektioner">
+              <button
+                aria-current={settingsSection === 'system' ? 'page' : undefined}
+                className={settingsSection === 'system' ? 'active' : ''}
+                onClick={() => setSettingsSection('system')}
+                type="button"
+              >
+                System
+              </button>
+              <button
+                aria-current={settingsSection === 'meshtastic' ? 'page' : undefined}
+                className={settingsSection === 'meshtastic' ? 'active' : ''}
+                onClick={() => setSettingsSection('meshtastic')}
+                type="button"
+              >
+                Meshtastic
+              </button>
+            </nav>
+
+            {settingsSection === 'system' ? (
+              <div className="system-settings">
+                <h2>Systemidentitet</h2>
+                <p className="settings-intro">
+                  Namn, systemroll och Meshtastic Node ID är separata identiteter. Namnet styr aldrig rollen.
+                </p>
+
+                <label htmlFor="system-name">System name</label>
+                <input
+                  id="system-name"
+                  maxLength={64}
+                  onChange={(event) => setSystemName(event.target.value)}
+                  value={systemName}
+                />
+
+                <label htmlFor="system-role">System role</label>
+                <select
+                  id="system-role"
+                  onChange={(event) => {
+                    setSystemRole(event.target.value as SystemRole)
+                    setConfirmRoleChange(false)
+                  }}
+                  value={systemRole}
+                >
+                  <option value="CLIENT">Client</option>
+                  <option value="PRIMARY">Primary server · experimental</option>
+                  <option value="BACKUP">Backup server · experimental</option>
+                </select>
+
+                {system && systemRole !== system.system_role && (
+                  <div className="role-warning" role="alert">
+                    <strong>Rollbyte påverkar framtida authority och failover.</strong>
+                    <label>
+                      <input
+                        checked={confirmRoleChange}
+                        onChange={(event) => setConfirmRoleChange(event.target.checked)}
+                        type="checkbox"
+                      />
+                      Jag bekräftar det uttryckliga rollbytet.
+                    </label>
+                  </div>
+                )}
+
+                <button
+                  disabled={
+                    !systemName.trim()
+                    || systemLoading
+                    || Boolean(system && systemRole !== system.system_role && !confirmRoleChange)
+                  }
+                  onClick={() => void saveSystemSettings()}
+                  type="button"
+                >
+                  {systemLoading ? 'Sparar…' : 'Spara systeminställningar'}
+                </button>
+
+                <div className="diagnostics">
+                  <h3>Diagnostics</h3>
+                  <dl className="radio-status">
+                    <div><dt>System name</dt><dd>{system?.system_name ?? 'SOLoRa Node'}</dd></div>
+                    <div><dt>System role</dt><dd>{roleLabel(system?.system_role)}</dd></div>
+                    <div><dt>Role status</dt><dd>{system?.role_status ?? 'active'}</dd></div>
+                    <div><dt>Meshtastic Node ID</dt><dd>{radio?.node_id ? `!${radio.node_id.toString(16).padStart(8, '0')}` : '–'}</dd></div>
+                    <div><dt>Connection</dt><dd>{radio?.connected ? connectionLabel(radio.connection?.connection_type) : 'Offline'}</dd></div>
+                    <div><dt>Channel</dt><dd>{radio?.selection?.channel_name ?? '–'}</dd></div>
+                    <div><dt>App version</dt><dd>{system?.app_version ?? '–'}</dd></div>
+                    <div><dt>Protocol version</dt><dd>{system?.protocol_version ?? '–'}</dd></div>
+                    <div><dt>Primary authority</dt><dd>{system?.primary_authority_node_id ? `!${system.primary_authority_node_id.toString(16).padStart(8, '0')}` : '–'}</dd></div>
+                  </dl>
+                </div>
+
+                <p className="identity-note">
+                  <strong>SOL1</strong> är endast ett möjligt visningsnamn. Primary definieras av rollen
+                  och identifieras utåt med Meshtastic Node ID.
+                </p>
+              </div>
+            ) : (
+              <div className="meshtastic-settings">
+                <h2>Meshtastic</h2>
+                <p className="settings-intro">
+                  Välj hur denna dator ansluter till Meshtastic-noden. Ingen terminal eller manuell config behövs.
+                </p>
 
             <fieldset className="connection-types">
               <legend>Anslutningstyp</legend>
@@ -336,6 +484,8 @@ export default function App() {
                 >
                   Bekräfta kanal
                 </button>
+              </div>
+            )}
               </div>
             )}
           </section>

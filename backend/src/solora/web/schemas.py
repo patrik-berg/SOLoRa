@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 from solora.domain.meshtastic_settings import MeshtasticConnectionType
+from solora.domain.system_settings import SystemRole
 
 
 class CreateThreadRequest(BaseModel):
@@ -92,3 +93,19 @@ class TestMeshtasticConnectionRequest(BaseModel):
         if not endpoint:
             raise ValueError("endpoint must not be blank")
         return endpoint
+
+
+class SystemSettingsResponse(BaseModel):
+    system_name: str
+    system_role: SystemRole
+    role_status: str
+    meshtastic_node_id: int | None
+    primary_authority_node_id: int | None
+    app_version: str
+    protocol_version: int
+
+
+class UpdateSystemSettingsRequest(BaseModel):
+    system_name: str = Field(min_length=1, max_length=64)
+    system_role: SystemRole
+    confirm_role_change: bool = False

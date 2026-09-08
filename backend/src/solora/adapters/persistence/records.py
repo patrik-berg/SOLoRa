@@ -100,3 +100,13 @@ class MeshtasticConnectionRecord(Base):
     node_name: Mapped[str | None] = mapped_column(String(64))
     firmware_version: Mapped[str | None] = mapped_column(String(64))
     last_contact: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SystemSettingsRecord(Base):
+    """Singleton containing display identity and explicit local behavior role."""
+
+    __tablename__ = "system_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    system_name: Mapped[str] = mapped_column(String(64))
+    system_role: Mapped[str] = mapped_column(String(16))
